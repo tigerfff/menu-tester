@@ -1,0 +1,8 @@
+node_modules/
+midscene_run/
+menu-test-results/
+hik-test-results/
+.DS_Store
+.env
+config/hik-config.json
+*.log

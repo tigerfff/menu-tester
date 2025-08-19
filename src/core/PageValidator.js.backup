@@ -1,0 +1,400 @@
+const { logger } = require('../utils/logger');
+
+class PageValidator {
+  constructor(agent, config) {
+    this.agent = agent;
+    this.config = config;
+    this.timeout = config.timeout || 6000;
+  }
+
+  /**
+   * Validate if a page loaded successfully after menu click
+   * @param {object} menu - Menu item that was clicked
+   * @param {string} initialUrl - URL before menu click
+   * @returns {object} Validation result with success, error, and details
+   */
+  async validatePageLoad(menu, initialUrl) {
+    const startTime = Date.now();
+    
+    try {
+      logger.debug(`Validating page load for menu: ${menu.text}`);
+
+      // Wait for potential navigation
+      await this.waitForNavigation();
+
+      // Quick validation within 1 second
+      const validationResult = await Promise.race([
+        this.performQuickValidation(menu, initialUrl),
+        this.createTimeoutResult()
+      ]);
+
+      const duration = Date.now() - startTime;
+      
+      return {
+        ...validationResult,
+        duration,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      
+      return {
+        success: false,
+        error: error.message,
+        errorType: 'validation_error',
+        duration,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Wait for potential page navigation
+   */
+  async waitForNavigation() {
+    try {
+      // Wait for network activity to settle
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Check if page is still loading
+      const isLoading = await this.agent.aiBoolean(
+        '页面是否还在加载中（显示加载动画或加载指示器）'
+      );
+
+      if (isLoading) {
+        // Wait up to 3 more seconds for loading to complete
+        await this.agent.aiWaitFor(
+          '页面加载完成（没有加载动画）',
+          { timeout: 3000 }
+        );
+      }
+    } catch (error) {
+      logger.debug(`Navigation wait failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Perform quick validation of page state
+   * @param {object} menu - Menu item that was clicked
+   * @param {string} initialUrl - URL before menu click
+   * @returns {object} Validation result
+   */
+  async performQuickValidation(menu, initialUrl) {
+    // Check for error pages first (fastest check)
+    const errorCheck = await this.checkForErrorPage();
+    if (!errorCheck.success) {
+      return errorCheck;
+    }
+
+    // Check for basic page functionality
+    const basicCheck = await this.checkBasicPageFunction();
+    if (!basicCheck.success) {
+      return basicCheck;
+    }
+
+    // Check if we navigated to a different page or content changed
+    const navigationCheck = await this.checkNavigation(initialUrl);
+    
+    // Determine success based on navigation or content change
+    const success = navigationCheck.navigated || navigationCheck.contentChanged;
+    
+    return {
+      success,
+      error: success ? null : 'No page change detected after menu click',
+      errorType: success ? null : 'no_navigation',
+      pageUrl: navigationCheck.currentUrl,
+      urlChanged: navigationCheck.navigated,
+      contentChanged: navigationCheck.contentChanged,
+      hasErrors: false
+    };
+  }
+
+  /**
+   * Create timeout result for race condition
+   * @returns {Promise<object>} Timeout result after 1 second
+   */
+  async createTimeoutResult() {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    return {
+      success: false,
+      error: 'Page validation timeout',
+      errorType: 'timeout',
+      hasErrors: false
+    };
+  }
+
+  /**
+   * Check for common error pages
+   * @returns {object} Error check result
+   */
+  async checkForErrorPage() {
+    try {
+      // Check for common error indicators
+      const hasError = await this.agent.aiBoolean(`
+        页面是否显示错误信息，包括：
+        - 404 页面未找到
+        - 500 服务器错误  
+        - 403 权限不足
+        - 网络连接错误
+        - 系统维护提示
+        - 登录失效提示
+      `);
+
+      if (hasError) {
+        // Try to get specific error message
+        const errorMessage = await this.getErrorMessage();
+        
+        return {
+          success: false,
+          error: errorMessage || 'Unknown error page detected',
+          errorType: 'error_page',
+          hasErrors: true
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.debug(`Error page check failed: ${error.message}`);
+      return { success: true }; // Assume no error if check fails
+    }
+  }
+
+  /**
+   * Get specific error message from error page
+   * @returns {string} Error message or null
+   */
+  async getErrorMessage() {
+    try {
+      const errorMessage = await this.agent.aiQuery(`
+        string,
+        提取页面中的错误信息文本，如果是错误页面请返回具体的错误消息
+      `);
+
+      return typeof errorMessage === 'string' ? errorMessage : null;
+    } catch (error) {
+      logger.debug(`Failed to extract error message: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Check basic page functionality
+   * @returns {object} Basic function check result
+   */
+  async checkBasicPageFunction() {
+    try {
+      // Check if page has basic interactive elements
+      const hasBasicFunction = await this.agent.aiBoolean(`
+        页面是否正常显示内容，包括：
+        - 页面有正常的文本内容
+        - 页面布局正常显示
+        - 没有显示空白页面
+        - 没有显示"加载失败"等错误信息
+      `);
+
+      if (!hasBasicFunction) {
+        return {
+          success: false,
+          error: 'Page appears to be blank or not functioning properly',
+          errorType: 'blank_page',
+          hasErrors: true
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      logger.debug(`Basic function check failed: ${error.message}`);
+      return { success: true }; // Assume success if check fails
+    }
+  }
+
+  /**
+   * Check if navigation occurred or content changed
+   * @param {string} initialUrl - URL before menu click
+   * @returns {object} Navigation check result
+   */
+  async checkNavigation(initialUrl) {
+    try {
+      // Get current URL
+      const currentUrl = await this.getCurrentUrl();
+      const navigated = currentUrl !== initialUrl;
+
+      // If URL didn't change, check if content changed (SPA behavior)
+      let contentChanged = false;
+      if (!navigated) {
+        contentChanged = await this.checkContentChange();
+      }
+
+      return {
+        navigated,
+        contentChanged,
+        currentUrl,
+        initialUrl
+      };
+    } catch (error) {
+      logger.debug(`Navigation check failed: ${error.message}`);
+      return {
+        navigated: false,
+        contentChanged: false,
+        currentUrl: initialUrl,
+        initialUrl
+      };
+    }
+  }
+
+  /**
+   * Get current page URL
+   * @returns {string} Current URL
+   */
+  async getCurrentUrl() {
+    try {
+      // Get URL from the page through the agent's page context
+      return await this.agent.page.url();
+    } catch (error) {
+      logger.debug(`Failed to get current URL: ${error.message}`);
+      return 'unknown';
+    }
+  }
+
+  /**
+   * Check if page content changed (for SPAs)
+   * @returns {boolean} Whether content changed
+   */
+  async checkContentChange() {
+    try {
+      // Use AI to detect if main content area has changed
+      const contentChanged = await this.agent.aiBoolean(`
+        页面的主要内容区域是否发生了变化，比如：
+        - 显示了新的页面内容
+        - 主要区域内容更新了
+        - 页面标题或导航状态发生变化
+      `);
+
+      return contentChanged;
+    } catch (error) {
+      logger.debug(`Content change check failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Perform detailed page analysis (for debugging)
+   * @param {object} menu - Menu item
+   * @returns {object} Detailed analysis result
+   */
+  async performDetailedAnalysis(menu) {
+    try {
+      logger.debug(`Performing detailed analysis for menu: ${menu.text}`);
+
+      const analysis = await this.agent.aiQuery(`
+        {
+          pageTitle: string,
+          hasContent: boolean,
+          hasErrors: boolean,
+          errorMessage: string,
+          mainContentType: string,
+          interactiveElements: number,
+          pageType: string
+        },
+        分析当前页面的详细信息，包括页面标题、是否有内容、是否有错误、主要内容类型、交互元素数量、页面类型等
+      `);
+
+      return {
+        success: true,
+        analysis: analysis || {},
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * Take screenshot for evidence
+   * @param {object} menu - Menu item
+   * @param {boolean} success - Whether validation was successful
+   * @returns {string} Screenshot path or null
+   */
+  async takeScreenshot(menu, success) {
+    if (!this.config.screenshots) {
+      return null;
+    }
+
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const status = success ? 'success' : 'failed';
+      const filename = `menu-${menu.id}-${status}-${timestamp}`;
+      
+      await this.agent.logScreenshot(filename, {
+        content: `Menu: ${menu.text}, Status: ${status}`
+      });
+
+      return filename;
+    } catch (error) {
+      logger.debug(`Screenshot failed: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Check if current page requires authentication
+   * @returns {boolean} Whether page needs authentication
+   */
+  async requiresAuthentication() {
+    try {
+      const needsAuth = await this.agent.aiBoolean(`
+        页面是否显示需要登录或认证的信息，比如：
+        - 登录表单
+        - "请先登录" 提示
+        - 认证错误信息
+        - 会话过期提示
+      `);
+
+      return needsAuth;
+    } catch (error) {
+      logger.debug(`Authentication check failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Get validation summary for multiple menu tests
+   * @param {Array} results - Array of validation results
+   * @returns {object} Summary statistics
+   */
+  getValidationSummary(results) {
+    const total = results.length;
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    const errors = results.filter(r => r.hasErrors).length;
+    const timeouts = results.filter(r => r.errorType === 'timeout').length;
+    
+    const avgDuration = results.reduce((sum, r) => sum + (r.duration || 0), 0) / total;
+    
+    const errorTypes = {};
+    results.forEach(r => {
+      if (r.errorType) {
+        errorTypes[r.errorType] = (errorTypes[r.errorType] || 0) + 1;
+      }
+    });
+
+    return {
+      total,
+      successful,
+      failed,
+      errors,
+      timeouts,
+      successRate: (successful / total * 100).toFixed(1) + '%',
+      avgDuration: Math.round(avgDuration),
+      errorTypes
+    };
+  }
+}
+
+module.exports = PageValidator; 

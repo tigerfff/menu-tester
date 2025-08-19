@@ -1,0 +1,433 @@
+const { chromium } = require('playwright');
+const { PlaywrightAgent } = require('@midscene/web/playwright');
+
+const TokenInjector = require('./utils/tokenInjector');
+const MenuDiscovery = require('./core/MenuDiscovery');
+const PageValidator = require('./core/PageValidator');
+const ExceptionHandler = require('./core/ExceptionHandler');
+const ProgressTracker = require('./core/ProgressTracker');
+const { logger } = require('./utils/logger');
+
+class MenuTester {
+  constructor(config) {
+    this.config = config;
+    this.browser = null;
+    this.page = null;
+    this.agent = null;
+    this.tokenInjector = null;
+    this.menuDiscovery = null;
+    this.pageValidator = null;
+    this.exceptionHandler = null;
+    this.progressTracker = null;
+    
+    // Set logger verbosity
+    logger.setVerbose(config.verbose || false);
+  }
+
+  /**
+   * Start the menu testing process
+   */
+  async start() {
+    try {
+      logger.info('Initializing menu tester...');
+      
+      // Initialize progress tracker
+      this.progressTracker = new ProgressTracker(this.config);
+      
+      // Clean up old sessions
+      await this.progressTracker.cleanupOldSessions();
+      
+      // Initialize browser and page
+      await this.initializeBrowser();
+      
+      // Initialize token injector
+      this.tokenInjector = new TokenInjector(this.config);
+      
+      // Initialize core modules
+      this.menuDiscovery = new MenuDiscovery(this.agent, this.config);
+      this.pageValidator = new PageValidator(this.agent, this.config);
+      this.exceptionHandler = new ExceptionHandler(this.agent, this.config);
+      
+      // Navigate to target URL and inject token
+      await this.setupPage();
+      
+      // Discover menus
+      const menus = await this.discoverMenus();
+      
+      if (menus.length === 0) {
+        throw new Error('No menus found on the page');
+      }
+      
+      // Initialize progress tracking with discovered menus
+      await this.progressTracker.initialize(menus);
+      
+      // Test all menus
+      await this.testAllMenus(menus);
+      
+      // Complete session
+      const summary = this.generateSummary(menus);
+      await this.progressTracker.complete(summary);
+      
+    } catch (error) {
+      logger.error(`Menu testing failed: ${error.message}`);
+      
+      if (this.progressTracker) {
+        await this.progressTracker.fail(error);
+      }
+      
+      throw error;
+    } finally {
+      await this.cleanup();
+    }
+  }
+
+  /**
+   * Resume an interrupted session
+   * @param {string} sessionId - Session ID to resume
+   */
+  async resumeSession(sessionId) {
+    try {
+      logger.info(`Resuming session: ${sessionId}`);
+      
+      // Initialize progress tracker and load existing progress
+      this.progressTracker = new ProgressTracker(this.config);
+      const loadedProgress = await this.progressTracker.loadProgress(sessionId);
+      
+      if (!loadedProgress) {
+        throw new Error(`Cannot load session: ${sessionId}`);
+      }
+      
+      // Resume from loaded progress
+      this.progressTracker.resumeFromProgress(loadedProgress);
+      
+      // Initialize browser and page
+      await this.initializeBrowser();
+      
+      // Initialize token injector
+      this.tokenInjector = new TokenInjector(this.config);
+      
+      // Initialize core modules
+      this.menuDiscovery = new MenuDiscovery(this.agent, this.config);
+      this.pageValidator = new PageValidator(this.agent, this.config);
+      this.exceptionHandler = new ExceptionHandler(this.agent, this.config);
+      
+      // Setup page
+      await this.setupPage();
+      
+      // Get resumable menus
+      const resumableMenus = this.progressTracker.getResumableMenus(loadedProgress);
+      
+      if (resumableMenus.length === 0) {
+        logger.success('All menus have been tested. Session already completed.');
+        return;
+      }
+      
+      logger.info(`Resuming ${resumableMenus.length} remaining menu tests...`);
+      
+      // Test remaining menus
+      await this.testAllMenus(resumableMenus);
+      
+      // Complete session
+      const summary = this.generateSummary(resumableMenus);
+      await this.progressTracker.complete(summary);
+      
+    } catch (error) {
+      logger.error(`Failed to resume session: ${error.message}`);
+      
+      if (this.progressTracker) {
+        await this.progressTracker.fail(error);
+      }
+      
+      throw error;
+    } finally {
+      await this.cleanup();
+    }
+  }
+
+  /**
+   * Initialize browser and page
+   */
+  async initializeBrowser() {
+    try {
+      logger.debug('Launching browser...');
+      
+      this.browser = await chromium.launch({
+        headless: this.config.headless,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+      
+      const context = await this.browser.newContext({
+        viewport: { width: 1280, height: 768 },
+        userAgent: this.config.userAgent || undefined
+      });
+      
+      this.page = await context.newPage();
+      
+      // Initialize Midscene agent
+      this.agent = new PlaywrightAgent(this.page, {
+        forceSameTabNavigation: true
+      });
+      
+      logger.success('Browser initialized successfully');
+      
+    } catch (error) {
+      throw new Error(`Failed to initialize browser: ${error.message}`);
+    }
+  }
+
+  /**
+   * Setup page - navigate and inject token
+   */
+  async setupPage() {
+    try {
+      await this.progressTracker.updateStep('page_setup');
+      
+      // 1. 先设置 Cookie 和 localStorage（在导航前）
+      await this.tokenInjector.inject(this.page, this.page.context());
+      
+      // 2. 然后导航到目标 URL
+      logger.info(`Navigating to: ${this.config.url}`);
+      await this.page.goto(this.config.url, {
+        waitUntil: 'networkidle',
+        timeout: this.config.timeout
+      });
+      
+      // 3. 等待页面完全加载和认证完成（使用更简单的验证）
+      await this.page.waitForLoadState('networkidle');
+      
+      // 4. 验证登录状态（而不是直接用 AI）
+      await this.page.waitForTimeout(2000); // 等待认证处理
+      
+      logger.success('Page setup completed');
+      
+    } catch (error) {
+      throw new Error(`Failed to setup page: ${error.message}`);
+    }
+  }
+
+  /**
+   * Discover all menus on the page
+   * @returns {Array} Array of discovered menus
+   */
+  async discoverMenus() {
+    try {
+      await this.progressTracker.updateStep('menu_discovery');
+      
+      logger.info('Discovering menus...');
+      
+      const menus = await this.menuDiscovery.discoverMenus(this.config.depth);
+      
+      if (menus.length === 0) {
+        // Try fallback discovery
+        logger.warning('No menus found, trying fallback discovery...');
+        const fallbackMenus = await this.menuDiscovery.fallbackMenuDetection();
+        
+        if (fallbackMenus.length === 0) {
+          throw new Error('No menus found on the page');
+        }
+        
+        return fallbackMenus;
+      }
+      
+      const stats = this.menuDiscovery.getMenuStats(menus);
+      logger.success(`Discovered ${stats.total} menu items (${stats.level1} top-level)`);
+      
+      return menus;
+      
+    } catch (error) {
+      throw new Error(`Menu discovery failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Test all discovered menus
+   * @param {Array} menus - Array of menus to test
+   */
+  async testAllMenus(menus) {
+    try {
+      await this.progressTracker.updateStep('menu_testing');
+      
+      const flatMenus = this.menuDiscovery.getFlattenedMenus(menus);
+      logger.info(`Testing ${flatMenus.length} menu items...`);
+      
+      for (const menu of flatMenus) {
+        await this.testSingleMenu(menu);
+        
+        // Add small delay between menu tests
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      logger.success('All menu tests completed');
+      
+    } catch (error) {
+      throw new Error(`Menu testing failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Test a single menu item
+   * @param {object} menu - Menu item to test
+   */
+  async testSingleMenu(menu) {
+    try {
+      await this.progressTracker.startMenu(menu.id);
+      
+      const result = await this.exceptionHandler.executeWithRetry(
+        async () => {
+          return await this.performMenuTest(menu);
+        },
+        {
+          menu,
+          page: this.page,
+          context: this.page.context(),
+          tokenInjector: this.tokenInjector,
+          initialUrl: this.page.url()
+        },
+        `Testing menu: ${menu.text}`
+      );
+      
+      await this.progressTracker.completeMenu(menu.id, result);
+      
+    } catch (error) {
+      const failResult = {
+        success: false,
+        error: error.message,
+        screenshot: null
+      };
+      
+      await this.progressTracker.completeMenu(menu.id, failResult);
+    }
+  }
+
+  /**
+   * Perform the actual menu test
+   * @param {object} menu - Menu item to test
+   * @returns {object} Test result
+   */
+  async performMenuTest(menu) {
+    const initialUrl = this.page.url();
+    
+    // Click the menu item
+    await this.agent.aiTap(`点击 "${menu.text}" 菜单`);
+    
+    // Validate page load
+    const validationResult = await this.pageValidator.validatePageLoad(menu, initialUrl);
+    
+    // Take screenshot if configured
+    let screenshot = null;
+    if (this.config.screenshots) {
+      screenshot = await this.pageValidator.takeScreenshot(menu, validationResult.success);
+    }
+    
+    // If navigation occurred, try to navigate back for next test
+    if (validationResult.urlChanged || validationResult.contentChanged) {
+      try {
+        // Try to navigate back to main page
+        await this.navigateBackToMain(initialUrl);
+      } catch (error) {
+        logger.debug(`Failed to navigate back: ${error.message}`);
+      }
+    }
+    
+    return {
+      success: validationResult.success,
+      error: validationResult.error,
+      screenshot,
+      details: validationResult
+    };
+  }
+
+  /**
+   * Navigate back to main page
+   * @param {string} mainUrl - Main page URL
+   */
+  async navigateBackToMain(mainUrl) {
+    try {
+      // Check if we need to navigate back
+      const currentUrl = this.page.url();
+      if (currentUrl === mainUrl) {
+        return; // Already on main page
+      }
+      
+      // Try to use browser back button first
+      await this.page.goBack({ waitUntil: 'networkidle' });
+      
+      // If that doesn't work, navigate directly
+      if (this.page.url() !== mainUrl) {
+        await this.page.goto(mainUrl, { waitUntil: 'networkidle' });
+      }
+      
+      // Wait for page to be ready
+      await this.agent.aiWaitFor('页面加载完成', { timeout: 3000 });
+      
+    } catch (error) {
+      logger.debug(`Navigation back failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Generate final summary
+   * @param {Array} menus - Array of tested menus
+   * @returns {object} Summary object
+   */
+  generateSummary(menus) {
+    const flatMenus = this.menuDiscovery.getFlattenedMenus(menus);
+    const stats = this.menuDiscovery.getMenuStats(menus);
+    
+    return {
+      totalMenus: stats.total,
+      testedMenus: stats.tested,
+      successfulMenus: stats.successful,
+      failedMenus: stats.failed,
+      successRate: stats.total > 0 ? (stats.successful / stats.total * 100).toFixed(1) + '%' : '0%',
+      menuBreakdown: {
+        level1: stats.level1,
+        expandable: stats.expandable
+      }
+    };
+  }
+
+  /**
+   * Cleanup resources
+   */
+  async cleanup() {
+    try {
+      if (this.tokenInjector && this.page) {
+        await this.tokenInjector.cleanup(this.page, this.page.context());
+      }
+      
+      if (this.browser) {
+        await this.browser.close();
+        logger.debug('Browser closed');
+      }
+    } catch (error) {
+      logger.debug(`Cleanup failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get current status
+   * @returns {object} Current status
+   */
+  getStatus() {
+    if (this.progressTracker) {
+      return this.progressTracker.getStatus();
+    }
+    
+    return {
+      status: 'not_started',
+      progress: { percentage: 0 }
+    };
+  }
+
+  /**
+   * List available sessions for resuming
+   * @returns {Array} Available sessions
+   */
+  async listSessions() {
+    const tracker = new ProgressTracker(this.config);
+    return await tracker.listAvailableSessions();
+  }
+}
+
+module.exports = MenuTester; 

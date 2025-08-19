@@ -1,0 +1,15 @@
+{
+  "url": "https://pb.hik-cloud.com/chain/index.html#/todo/patrol",
+  "token": "52d377bb-08cd-4bf5-bc23-b4b645e2fc8a",
+  "tokenMethod": "cookie",
+  "tokenName": "accessToken",
+  "headless": false,
+  "verbose": true,
+  "timeout": 10000,
+  "depth": 2,
+  "retry": 3,
+  "skip": "logout,exit,注销,登出,退出",
+  "include": "*",
+  "screenshots": true,
+  "output": "./hik-test-results"
+} 
