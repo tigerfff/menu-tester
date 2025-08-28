@@ -9,11 +9,11 @@ class ExceptionHandler {
   }
 
   /**
-   * Execute a function with retry mechanism and exception handling
-   * @param {Function} fn - Function to execute
-   * @param {object} context - Context for the operation
-   * @param {string} operation - Description of the operation
-   * @returns {Promise<object>} Result with success status and data
+   * 使用重试机制和异常处理执行函数
+   * @param {Function} fn - 要执行的函数
+   * @param {object} context - 操作上下文
+   * @param {string} operation - 操作描述
+   * @returns {Promise<object>} 包含成功状态和数据的结果
    */
   async executeWithRetry(fn, context = {}, operation = 'operation') {
     let lastError = null;
@@ -23,8 +23,10 @@ class ExceptionHandler {
       try {
         logger.debug(`${operation} - Attempt ${attempt + 1}/${this.maxRetries + 1}`);
         
-        // Handle page exceptions before executing
-        await this.handlePageExceptions();
+        // Handle page exceptions only when necessary (first attempt or forced)
+        if (attempt === 0 || context.forcePageExceptionCheck) {
+          await this.handlePageExceptions();
+        }
         
         // Execute the function
         const result = await fn();
@@ -48,7 +50,7 @@ class ExceptionHandler {
         
         if (handled.recovered && attempt <= this.maxRetries) {
           logger.info(`Exception handled, retrying ${operation}...`);
-          await this.delay(this.retryDelay);
+          await this.delay(this.retryDelay);  
           continue;
         }
         
@@ -69,7 +71,7 @@ class ExceptionHandler {
   }
 
   /**
-   * Handle general page exceptions
+   * 处理一般页面异常
    */
   async handlePageExceptions() {
     try {
@@ -83,7 +85,7 @@ class ExceptionHandler {
   }
 
   /**
-   * Handle popup windows and modals
+   * 处理弹窗和模态框
    */
   async handlePopups() {
     try {
@@ -113,7 +115,7 @@ class ExceptionHandler {
   }
 
   /**
-   * Handle page errors and loading issues
+   * 处理页面错误和加载问题
    */
   async handlePageErrors() {
     try {
@@ -139,7 +141,7 @@ class ExceptionHandler {
   }
 
   /**
-   * Handle network-related issues
+   * 处理网络相关问题
    */
   async handleNetworkIssues() {
     try {
@@ -168,10 +170,10 @@ class ExceptionHandler {
   }
 
   /**
-   * Handle specific exceptions based on error type
-   * @param {Error} error - The caught error
-   * @param {object} context - Operation context
-   * @returns {object} Handling result
+   * 根据错误类型处理特定异常
+   * @param {Error} error - 捕获的错误
+   * @param {object} context - 操作上下文
+   * @returns {object} 处理结果
    */
   async handleSpecificException(error, context) {
     const errorMessage = error.message.toLowerCase();
@@ -207,10 +209,10 @@ class ExceptionHandler {
   }
 
   /**
-   * Handle timeout errors
-   * @param {Error} error - Timeout error
-   * @param {object} context - Operation context
-   * @returns {object} Handling result
+   * 处理超时错误
+   * @param {Error} error - 超时错误
+   * @param {object} context - 操作上下文
+   * @returns {object} 处理结果
    */
   async handleTimeoutError(error, context) {
     logger.debug('Handling timeout error...');
@@ -230,10 +232,10 @@ class ExceptionHandler {
   }
 
   /**
-   * Handle element not found errors
-   * @param {Error} error - Element error
-   * @param {object} context - Operation context
-   * @returns {object} Handling result
+   * 处理元素未找到错误
+   * @param {Error} error - 元素错误
+   * @param {object} context - 操作上下文
+   * @returns {object} 处理结果
    */
   async handleElementError(error, context) {
     logger.debug('Handling element error...');
@@ -253,10 +255,10 @@ class ExceptionHandler {
   }
 
   /**
-   * Handle navigation errors
-   * @param {Error} error - Navigation error
-   * @param {object} context - Operation context
-   * @returns {object} Handling result
+   * 处理导航错误
+   * @param {Error} error - 导航错误
+   * @param {object} context - 操作上下文
+   * @returns {object} 处理结果
    */
   async handleNavigationError(error, context) {
     logger.debug('Handling navigation error...');
@@ -273,10 +275,10 @@ class ExceptionHandler {
   }
 
   /**
-   * Handle authentication errors
-   * @param {Error} error - Auth error
-   * @param {object} context - Operation context
-   * @returns {object} Handling result
+   * 处理认证错误
+   * @param {Error} error - 认证错误
+   * @param {object} context - 操作上下文
+   * @returns {object} 处理结果
    */
   async handleAuthError(error, context) {
     logger.debug('Handling authentication error...');
@@ -291,10 +293,10 @@ class ExceptionHandler {
   }
 
   /**
-   * Handle generic errors
-   * @param {Error} error - Generic error
-   * @param {object} context - Operation context
-   * @returns {object} Handling result
+   * 处理通用错误
+   * @param {Error} error - 通用错误
+   * @param {object} context - 操作上下文
+   * @returns {object} 处理结果
    */
   async handleGenericError(error, context) {
     logger.debug('Handling generic error...');
@@ -308,8 +310,8 @@ class ExceptionHandler {
   }
 
   /**
-   * Check if page is responsive
-   * @returns {boolean} Whether page is responsive
+   * 检查页面是否响应
+   * @returns {boolean} 页面是否响应
    */
   async checkPageResponsiveness() {
     try {
@@ -322,7 +324,7 @@ class ExceptionHandler {
   }
 
   /**
-   * Wait for page to stabilize
+   * 等待页面稳定
    */
   async waitForPageStability() {
     try {
@@ -336,9 +338,9 @@ class ExceptionHandler {
   }
 
   /**
-   * Try to scroll to find an element
-   * @param {object} menu - Menu item to find
-   * @returns {boolean} Whether element was found after scrolling
+   * 尝试滚动查找元素
+   * @param {object} menu - 要查找的菜单项
+   * @returns {boolean} 滚动后是否找到元素
    */
   async scrollToFindElement(menu) {
     try {
@@ -362,7 +364,7 @@ class ExceptionHandler {
   }
 
   /**
-   * Refresh the current page
+   * 刷新当前页面
    */
   async refreshPage() {
     try {
@@ -380,8 +382,8 @@ class ExceptionHandler {
   }
 
   /**
-   * Navigate to a specific URL
-   * @param {string} url - URL to navigate to
+   * 导航到特定URL
+   * @param {string} url - 要导航到的URL
    */
   async navigateToUrl(url) {
     try {
@@ -399,7 +401,7 @@ class ExceptionHandler {
   }
 
   /**
-   * Retry network action
+   * 重试网络操作
    */
   async retryNetworkAction() {
     try {
@@ -418,17 +420,17 @@ class ExceptionHandler {
   }
 
   /**
-   * Create a delay
-   * @param {number} ms - Milliseconds to delay
+   * 创建延迟
+   * @param {number} ms - 延迟的毫秒数
    */
   async delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
-   * Get error statistics for a session
-   * @param {Array} errors - Array of error objects
-   * @returns {object} Error statistics
+   * 获取会话的错误统计
+   * @param {Array} errors - 错误对象数组
+   * @returns {object} 错误统计
    */
   getErrorStats(errors) {
     const total = errors.length;
@@ -471,9 +473,9 @@ class ExceptionHandler {
   }
 
   /**
-   * Check if an error is recoverable
-   * @param {Error} error - Error to check
-   * @returns {boolean} Whether error is potentially recoverable
+   * 检查错误是否可恢复
+   * @param {Error} error - 要检查的错误
+   * @returns {boolean} 错误是否可能恢复
    */
   isRecoverableError(error) {
     const errorMessage = error.message.toLowerCase();

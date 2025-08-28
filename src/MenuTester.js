@@ -56,7 +56,7 @@ class MenuTester {
       await this.executeSmartMenuTesting();
       
     } catch (error) {
-      logger.error(`Menu testing failed: ${error.message}`);
+          logger.error(`Menu testing failed: ${error.message}`);
       
       if (this.progressTracker) {
         await this.progressTracker.fail(error);
@@ -122,11 +122,39 @@ class MenuTester {
     try {
       logger.info(`Starting layered testing for ${topLevelMenus.length} top-level menus...`);
       
-      for (const topMenu of topLevelMenus) {
+      // 分离下拉菜单项和常规菜单项
+      const regularMenus = topLevelMenus.filter(menu => !menu.isDropdownItem);
+      const dropdownMenus = topLevelMenus.filter(menu => menu.isDropdownItem);
+      
+      // 先测试常规菜单
+      for (const topMenu of regularMenus) {
         await this.testMenuWithContext(topMenu, 1);
         
         // 短暂延迟，避免操作过快
         await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // 然后测试下拉菜单项（需要重新展开）
+      if (dropdownMenus.length > 0) {
+        logger.info(`Testing ${dropdownMenus.length} dropdown menu items...`);
+        
+        // 重新发现下拉菜单以确保"更多"菜单是展开的
+        const rediscoveredMenus = await this.menuDiscovery.rediscoverDropdownMenus();
+        
+        // 合并原有的下拉菜单和重新发现的菜单
+        const allDropdownMenus = [...dropdownMenus];
+        for (const rediscovered of rediscoveredMenus) {
+          if (!allDropdownMenus.find(menu => menu.text === rediscovered.text)) {
+            allDropdownMenus.push(rediscovered);
+          }
+        }
+        
+        for (const dropdownMenu of allDropdownMenus) {
+          await this.testMenuWithContext(dropdownMenu, 1);
+          
+          // 短暂延迟，避免操作过快
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       }
       
       logger.success('Layered testing completed');
@@ -158,7 +186,7 @@ class MenuTester {
       await this.progressTracker.completeMenu(menu.id, testResult);
       
       // 如果是一级菜单且测试成功，发现并测试子菜单
-      if (level === 1 && testResult.success && !testResult.isCrossDomain) {
+      if (level === 1 && testResult.success && !testResult.isCrossDomain && !(await this.isBackToMainPage(menu))) {
         await this.discoverAndTestSubMenus(menu, level + 1);
       }
       
@@ -216,7 +244,17 @@ class MenuTester {
       }
       
       // 测试所有子菜单
-      for (const subMenu of subMenus) {
+      logger.info(`开始测试 ${subMenus.length} 个 L${level} 菜单项`);
+      for (let i = 0; i < subMenus.length; i++) {
+        const subMenu = subMenus[i];
+        logger.progress(`测试 L${level} 菜单 ${i + 1}/${subMenus.length}: ${subMenu.text}`);
+        
+        // 更新菜单状态为测试中
+        if (this.progressTracker.progress.menus[subMenu.id]) {
+          this.progressTracker.progress.menus[subMenu.id].status = 'testing';
+          this.progressTracker.progress.menus[subMenu.id].startTime = Date.now();
+        }
+        
         await this.testMenuWithContext(subMenu, level);
         
         // 在测试子菜单之间短暂延迟
@@ -278,8 +316,8 @@ class MenuTester {
   async performMenuTest(menu, level) {
     const initialUrl = this.page.url();
     
-    // 点击菜单项
-    await this.agent.aiTap(`点击 "${menu.text}" 菜单`);
+    // 使用智能点击方法处理菜单项（包括下拉菜单项）
+    await this.menuDiscovery.smartClickMenu(menu);
     
     // 验证页面响应
     const validationResult = await this.pageValidator.validatePageLoad(menu, initialUrl);
@@ -297,7 +335,8 @@ class MenuTester {
       success: validationResult.success,
       error: validationResult.error,
       screenshot,
-      details: validationResult
+      details: validationResult,
+      isCrossDomain: validationResult.isCrossDomain  // 确保跨域标记被传递
     };
   }
 
@@ -495,6 +534,29 @@ class MenuTester {
   }
 
   /**
+   * 检查是否已经回到主页面（避免将主页面菜单误认为子菜单）
+   * @param {object} originalMenu - 原始点击的菜单
+   * @returns {boolean} 是否回到了主页面
+   */
+  async isBackToMainPage(originalMenu) {
+    try {
+      const currentUrl = this.page.url();
+      const mainUrl = this.config.url;
+      
+      // 如果URL回到了主页面，说明是跨域返回
+      if (currentUrl === mainUrl || currentUrl.includes('#/home')) {
+        logger.debug(`Detected return to main page after clicking ${originalMenu.text}, skipping sub-menu discovery`);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      logger.debug(`Failed to check main page: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
    * Initialize browser and page
    */
   async initializeBrowser() {
@@ -507,7 +569,7 @@ class MenuTester {
       });
       
       const context = await this.browser.newContext({
-        viewport: { width: 1280, height: 768 },
+        viewport: { width: 1920, height: 1080 },
         userAgent: this.config.userAgent || undefined
       });
       

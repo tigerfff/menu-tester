@@ -14,14 +14,14 @@ const program = new Command();
 program
   .name('menu-tester')
   .description('AI-powered menu testing tool using Playwright and Midscene.js')
-  .version('1.0.0');
+  .version('1.0.0');    
 
 program
   .option('--url <url>', 'Target admin platform URL')
   .option('--token <token>', 'Access token for authentication')
   .option('--config <path>', 'Configuration file path')
   .option('--depth <number>', 'Menu testing depth', '2')
-  .option('--timeout <number>', 'Page timeout in milliseconds', '6000')
+  .option('--timeout <number>', 'Page timeout in milliseconds', '10000')
   .option('--headless [boolean]', 'Run in headless mode', true)
   .option('--output <path>', 'Output directory for results', './menu-test-results')
   .option('--resume <sessionId>', 'Resume interrupted test session')

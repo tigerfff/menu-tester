@@ -3,7 +3,7 @@
   "token": "your-access-token-here",
   "options": {
     "depth": 2,
-    "timeout": 6000,
+    "timeout": 10000,
     "headless": true,
     "output": "./menu-test-results",
     "concurrent": 1,
