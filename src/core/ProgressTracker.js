@@ -132,6 +132,78 @@ class ProgressTracker {
   }
 
   /**
+   * 动态添加新发现的菜单到进度跟踪
+   * @param {Array} newMenus - 新发现的菜单列表
+   */
+  async addDiscoveredMenus(newMenus) {
+    if (!Array.isArray(newMenus) || newMenus.length === 0) {
+      return;
+    }
+
+    let addedCount = 0;
+    
+    for (const menu of newMenus) {
+      // 检查菜单是否已存在
+      if (this.progress.menus[menu.id]) {
+        continue;
+      }
+      
+      this.progress.menus[menu.id] = {
+        id: menu.id,
+        text: menu.text,
+        level: menu.level || 1,
+        parentPath: menu.path ? menu.path.slice(0, -1).join(' → ') : '',
+        fullPath: menu.path ? menu.path.join(' → ') : menu.text,
+        area: menu.area || 'unknown',
+        status: 'pending',
+        attempts: 0,
+        error: null,
+        startTime: null,
+        endTime: null,
+        duration: null,
+        screenshot: null
+      };
+      
+      this.progress.totalMenus++;
+      addedCount++;
+    }
+    
+    if (addedCount > 0) {
+      this.progress.timestamps.updated = new Date().toISOString();
+      await this.saveProgress();
+      logger.debug(`动态添加了 ${addedCount} 个新菜单到进度跟踪`);
+    }
+  }
+
+  /**
+   * 获取指定菜单的子菜单数量
+   * @param {string} parentMenuId - 父菜单ID
+   * @returns {number} 子菜单数量
+   */
+  getChildMenuCount(parentMenuId) {
+    let count = 0;
+    Object.values(this.progress.menus).forEach(menu => {
+      if (menu.parentPath && menu.parentPath.includes(this.progress.menus[parentMenuId]?.text)) {
+        count++;
+      }
+    });
+    return count;
+  }
+
+  /**
+   * 更新菜单的层级信息
+   * @param {string} menuId - 菜单ID
+   * @param {object} levelInfo - 层级信息
+   */
+  async updateMenuLevel(menuId, levelInfo) {
+    if (this.progress.menus[menuId]) {
+      Object.assign(this.progress.menus[menuId], levelInfo);
+      this.progress.timestamps.updated = new Date().toISOString();
+      await this.saveProgress();
+    }
+  }
+
+  /**
    * Mark menu as completed
    * @param {string} menuId - Menu ID
    * @param {object} result - Test result

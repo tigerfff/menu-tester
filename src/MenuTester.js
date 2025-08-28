@@ -6,6 +6,7 @@ const MenuDiscovery = require('./core/MenuDiscovery');
 const PageValidator = require('./core/PageValidator');
 const ExceptionHandler = require('./core/ExceptionHandler');
 const ProgressTracker = require('./core/ProgressTracker');
+const MenuNavigator = require('./core/MenuNavigator');
 const { logger } = require('./utils/logger');
 
 class MenuTester {
@@ -19,6 +20,7 @@ class MenuTester {
     this.pageValidator = null;
     this.exceptionHandler = null;
     this.progressTracker = null;
+    this.menuNavigator = null;
     this.mainPageUrl = config.url; // 主页面URL，用于跨域返回
     
     // Set logger verbosity
@@ -48,6 +50,7 @@ class MenuTester {
       this.menuDiscovery = new MenuDiscovery(this.agent, this.config);
       this.pageValidator = new PageValidator(this.agent, this.config);
       this.exceptionHandler = new ExceptionHandler(this.agent, this.config);
+      this.menuNavigator = new MenuNavigator(this.agent, this.config);
       
       // Navigate to target URL and inject token
       await this.setupPage();
@@ -69,31 +72,42 @@ class MenuTester {
   }
 
   /**
-   * 执行智能菜单测试（新的核心流程）
+   * 执行智能菜单测试（边发现边测试模式）
    */
   async executeSmartMenuTesting() {
     try {
       await this.progressTracker.updateStep('smart_menu_testing');
       
       // 1. 发现顶级菜单
-      const topLevelMenus = await this.discoverTopLevelMenus();
+      const rootMenus = await this.discoverTopLevelMenus();
       
-      if (topLevelMenus.length === 0) {
-        throw new Error('No top-level menus found on the page');
+      if (rootMenus.length === 0) {
+        throw new Error('未发现任何菜单项');
       }
       
-      // 2. 初始化进度跟踪
-      await this.progressTracker.initialize(topLevelMenus);
+      // 2. 初始化进度跟踪（仅用已知的根菜单）
+      await this.progressTracker.initialize(rootMenus);
       
-      // 3. 执行分层测试
-      await this.executeLayeredTesting(topLevelMenus);
+      // 3. 对每个根菜单进行深度优先测试（边发现边测试）
+      for (let i = 0; i < rootMenus.length; i++) {
+        const rootMenu = rootMenus[i];
+        logger.info(`开始测试第 ${i + 1}/${rootMenus.length} 个根菜单: ${rootMenu.text}`);
+        
+        await this.testMenuBranchRecursively(rootMenu, 1);
+        
+        // 完成一个根菜单分支后，返回首页准备下一个分支
+        if (i < rootMenus.length - 1) {
+          await this.menuNavigator.navigateToHome();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
       
       // 4. 生成最终报告
-      const summary = this.generateLayeredSummary(topLevelMenus);
+      const summary = this.generateFinalSummary();
       await this.progressTracker.complete(summary);
       
     } catch (error) {
-      throw new Error(`Smart menu testing failed: ${error.message}`);
+      throw new Error(`智能菜单测试失败: ${error.message}`);
     }
   }
 
@@ -104,19 +118,250 @@ class MenuTester {
     try {
       await this.progressTracker.updateStep('top_menu_discovery');
       
-      logger.info('Discovering top-level menus...');
+      logger.info('发现顶级菜单...');
       const topMenus = await this.menuDiscovery.discoverTopLevelMenus();
       
-      logger.success(`Discovered ${topMenus.length} top-level menu items`);
-      return topMenus;
+      // 为根菜单添加路径信息
+      const normalizedMenus = topMenus.map((menu, index) => ({
+        ...menu,
+        id: menu.id || `root-menu-${index}`,
+        level: 1,
+        path: menu.isDropdownItem ? ['more', menu.text] : [menu.text],
+        parent: null,
+        tested: false,
+        success: null,
+        error: null
+      }));
+      
+      logger.success(`发现 ${normalizedMenus.length} 个顶级菜单项`);
+      return normalizedMenus;
       
     } catch (error) {
-      throw new Error(`Top-level menu discovery failed: ${error.message}`);
+      throw new Error(`顶级菜单发现失败: ${error.message}`);
     }
   }
 
   /**
-   * 执行分层测试
+   * 递归测试菜单分支（边发现边测试的核心方法）
+   * @param {object} menu - 当前菜单
+   * @param {number} level - 菜单层级
+   */
+  async testMenuBranchRecursively(menu, level) {
+    try {
+      logger.progress(`测试 L${level} 菜单: ${menu.text} (路径: ${menu.path?.join(' → ') || menu.text})`);
+      
+      // 1. 测试当前菜单
+      const testResult = await this.testSingleMenuWithContext(menu, level);
+      
+      // 2. 如果测试成功且不是跨域，且未达到最大深度，尝试发现并测试子菜单
+      if (testResult.success && 
+          !testResult.isCrossDomain && 
+          level < this.config.depth &&
+          !await this.isBackToMainPage(menu)) {
+        
+        // 3. 发现当前页面的子菜单
+        const subMenus = await this.discoverCurrentSubMenus(menu, level);
+        
+        if (subMenus.length > 0) {
+          logger.info(`在 "${menu.text}" 下发现 ${subMenus.length} 个子菜单`);
+          
+          // 4. 动态添加子菜单到进度跟踪
+          await this.progressTracker.addDiscoveredMenus(subMenus);
+          
+          // 5. 递归测试每个子菜单
+          for (let i = 0; i < subMenus.length; i++) {
+            const subMenu = subMenus[i];
+            
+            await this.testMenuBranchRecursively(subMenu, level + 1);
+            
+            // 在测试子菜单之间返回当前菜单页面（除非是最后一个）
+            if (i < subMenus.length - 1) {
+              await this.navigateBackToParentMenu(menu);
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+        } else {
+          logger.debug(`菜单 "${menu.text}" 下无子菜单`);
+        }
+      }
+      
+      // 6. 如果不是根菜单且有父菜单，准备返回（由调用者处理）
+      if (level > 1 && menu.parent) {
+        logger.debug(`完成菜单 "${menu.text}" 测试，准备返回上级`);
+      } else if (level === 1) {
+        logger.debug(`完成根菜单 "${menu.text}" 的整个分支测试`);
+      }
+      
+    } catch (error) {
+      logger.error(`测试菜单分支 "${menu.text}" 失败: ${error.message}`);
+      
+      // 记录失败结果
+      const failResult = {
+        success: false,
+        error: error.message,
+        screenshot: null
+      };
+      
+      if (menu.id && this.progressTracker.progress.menus[menu.id]) {
+        await this.progressTracker.completeMenu(menu.id, failResult);
+      }
+    }
+  }
+
+  /**
+   * 发现当前页面的子菜单
+   * @param {object} parentMenu - 父菜单
+   * @param {number} currentLevel - 当前层级
+   * @returns {Array} 子菜单列表
+   */
+  async discoverCurrentSubMenus(parentMenu, currentLevel) {
+    try {
+      // 等待页面稳定
+      await this.waitForPageStable();
+      
+      // 发现左侧菜单（主要的子菜单来源）
+      const sidebarMenus = await this.menuDiscovery.discoverCurrentPageSubMenus();
+      
+      // 构建完整的菜单对象
+      return sidebarMenus.map((menu, index) => ({
+        id: `${parentMenu.id}-child-${index}`,
+        text: menu.text,
+        level: currentLevel + 1,
+        parent: parentMenu,
+        path: [...(parentMenu.path || [parentMenu.text]), menu.text],
+        area: 'sidebar',
+        isDropdownItem: false,
+        tested: false,
+        success: null,
+        error: null
+      }));
+      
+    } catch (error) {
+      logger.debug(`发现 "${parentMenu.text}" 的子菜单失败: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * 等待页面稳定
+   */
+  async waitForPageStable() {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    try {
+      await this.agent.aiWaitFor(
+        '页面加载完成且内容稳定显示',
+        { timeout: 3000 }
+      );
+    } catch (error) {
+      logger.debug('等待页面稳定超时');
+    }
+  }
+
+  /**
+   * 测试单个菜单（包含上下文处理）
+   * @param {object} menu - 菜单项
+   * @param {number} level - 菜单层级
+   */
+  async testSingleMenuWithContext(menu, level) {
+    try {
+      await this.progressTracker.startMenu(menu.id);
+      
+      // 1. 使用智能导航器导航到菜单
+      await this.menuNavigator.navigateToMenu(menu);
+      
+      // 2. 验证页面响应
+      const initialUrl = await this.getCurrentUrl();
+      const validationResult = await this.pageValidator.validatePageLoad(menu, initialUrl);
+      
+      // 3. 截图（如果配置了）
+      let screenshot = null;
+      if (this.config.screenshots) {
+        screenshot = await this.pageValidator.takeScreenshot(menu, validationResult.success);
+      }
+      
+      // 4. 构建测试结果
+      const testResult = {
+        success: validationResult.success,
+        error: validationResult.error,
+        screenshot,
+        details: validationResult,
+        isCrossDomain: validationResult.isCrossDomain
+      };
+      
+      // 5. 记录测试结果
+      await this.progressTracker.completeMenu(menu.id, testResult);
+      
+      return testResult;
+      
+    } catch (error) {
+      const failResult = {
+        success: false,
+        error: error.message,
+        screenshot: null
+      };
+      
+      await this.progressTracker.completeMenu(menu.id, failResult);
+      return failResult;
+    }
+  }
+
+  /**
+   * 返回到父菜单页面
+   * @param {object} parentMenu - 父菜单
+   */
+  async navigateBackToParentMenu(parentMenu) {
+    try {
+      logger.debug(`返回到父菜单: ${parentMenu.text}`);
+      await this.menuNavigator.navigateToMenu(parentMenu);
+    } catch (error) {
+      logger.debug(`返回父菜单失败: ${error.message}，尝试浏览器后退`);
+      try {
+        await this.page.goBack({ waitUntil: 'networkidle', timeout: 3000 });
+      } catch (backError) {
+        logger.debug(`浏览器后退也失败: ${backError.message}`);
+      }
+    }
+  }
+
+  /**
+   * 生成最终汇总报告
+   * @returns {object} 汇总信息
+   */
+  generateFinalSummary() {
+    const allMenus = Object.values(this.progressTracker.progress.menus);
+    
+    const byLevel = {
+      level1: allMenus.filter(m => m.level === 1).length,
+      level2: allMenus.filter(m => m.level === 2).length,
+      level3: allMenus.filter(m => m.level === 3).length
+    };
+    
+    const byResult = {
+      successful: allMenus.filter(m => {
+        const menuResult = this.progressTracker.progress.menus[m.id];
+        return menuResult && menuResult.status === 'completed';
+      }).length,
+      failed: allMenus.filter(m => {
+        const menuResult = this.progressTracker.progress.menus[m.id];
+        return menuResult && menuResult.status === 'failed';
+      }).length,
+      pending: allMenus.filter(m => {
+        const menuResult = this.progressTracker.progress.menus[m.id];
+        return menuResult && menuResult.status === 'pending';
+      }).length
+    };
+    
+    return {
+      totalMenus: allMenus.length,
+      ...byLevel,
+      ...byResult,
+      successRate: allMenus.length > 0 ? (byResult.successful / allMenus.length * 100).toFixed(1) + '%' : '0%'
+    };
+  }
+
+  /**
+   * 原有的分层测试方法（保留作为备用）
    */
   async executeLayeredTesting(topLevelMenus) {
     try {
@@ -605,8 +850,12 @@ class MenuTester {
         timeout: this.config.timeout
       });
       
-      // 等待页面完全稳定
-      await this.page.waitForLoadState('networkidle');
+      // 等待页面完全稳定（兼容没有 waitForLoadState 的环境）
+      if (typeof this.page.waitForLoadState === 'function') {
+        await this.page.waitForLoadState('networkidle');
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       logger.success('Page setup completed');

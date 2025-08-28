@@ -406,6 +406,133 @@ class MenuDiscovery {
   }
 
   /**
+   * 发现当前页面的子菜单（边发现边测试模式）
+   * @returns {Array} 当前页面的子菜单列表
+   */
+  async discoverCurrentPageSubMenus() {
+    try {
+      logger.debug('发现当前页面的子菜单...');
+      
+      // 检查是否有左侧菜单
+      const hasSidebar = await this.agent.aiBoolean(`
+        当前页面是否有左侧菜单栏或侧边导航菜单
+      `);
+      
+      if (!hasSidebar) {
+        logger.debug('当前页面无左侧菜单');
+        return [];
+      }
+      
+      const sidebarQuery = `
+        {
+          text: string,
+          isVisible: boolean,
+          isClickable: boolean,
+          isExpanded: boolean
+        }[],
+        列出当前页面左侧菜单中所有可见且可点击的菜单项，
+        只返回第一层菜单项，不要展开子菜单
+      `;
+      
+      const menus = await this.agent.aiQuery(sidebarQuery);
+      
+      if (!Array.isArray(menus)) {
+        logger.debug('AI 查询返回非数组结果');
+        return [];
+      }
+      
+      const filteredMenus = menus
+        .filter(menu => menu.isVisible && menu.isClickable && menu.text && menu.text.trim() !== '')
+        .map((menu, index) => ({
+          id: `sidebar-${Date.now()}-${index}`,
+          text: menu.text.trim(),
+          isVisible: menu.isVisible,
+          isClickable: menu.isClickable,
+          isExpanded: menu.isExpanded || false,
+          area: 'sidebar'
+        }));
+      
+      logger.debug(`发现 ${filteredMenus.length} 个左侧菜单项`);
+      return this.filterMenus(filteredMenus);
+      
+    } catch (error) {
+      logger.debug(`发现当前页面子菜单失败: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * 检查当前页面是否有更深层的子菜单
+   * @param {object} menuItem - 当前菜单项
+   * @returns {boolean} 是否有子菜单
+   */
+  async hasSubMenus(menuItem) {
+    try {
+      const hasSubMenus = await this.agent.aiBoolean(`
+        点击菜单项"${menuItem.text}"后，是否会显示更多的子菜单或下级菜单
+      `);
+      
+      return hasSubMenus;
+    } catch (error) {
+      logger.debug(`检查菜单"${menuItem.text}"的子菜单失败: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * 发现特定菜单项下的子菜单
+   * @param {object} parentMenu - 父菜单项
+   * @returns {Array} 子菜单列表
+   */
+  async discoverSubMenusOf(parentMenu) {
+    try {
+      logger.debug(`发现菜单"${parentMenu.text}"的子菜单...`);
+      
+      // 检查是否有展开的子菜单
+      const hasExpandedSubMenus = await this.agent.aiBoolean(`
+        菜单项"${parentMenu.text}"是否已展开并显示了子菜单项
+      `);
+      
+      if (!hasExpandedSubMenus) {
+        logger.debug(`菜单"${parentMenu.text}"无展开的子菜单`);
+        return [];
+      }
+      
+      const subMenuQuery = `
+        {
+          text: string,
+          isVisible: boolean,
+          isClickable: boolean,
+          level: number
+        }[],
+        列出菜单项"${parentMenu.text}"下所有可见的子菜单项
+      `;
+      
+      const subMenus = await this.agent.aiQuery(subMenuQuery);
+      
+      if (!Array.isArray(subMenus)) {
+        return [];
+      }
+      
+      return subMenus
+        .filter(menu => menu.isVisible && menu.isClickable && menu.text)
+        .map((menu, index) => ({
+          id: `${parentMenu.id}-sub-${index}`,
+          text: menu.text.trim(),
+          level: (menu.level || 2),
+          parent: parentMenu,
+          isVisible: menu.isVisible,
+          isClickable: menu.isClickable,
+          area: 'sidebar-sub'
+        }));
+        
+    } catch (error) {
+      logger.debug(`发现菜单"${parentMenu.text}"的子菜单失败: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
    * 多重策略展开下拉菜单（第一策略优先用固定 id）
    */
   async expandDropdownWithMultipleStrategies() {
