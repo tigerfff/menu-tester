@@ -89,11 +89,11 @@ class ProgressTracker {
       
       await this.saveProgress();
       
-      logger.info(`Progress tracking initialized. Session ID: ${this.sessionId}`);
-      logger.info(`Tracking ${menus.length} menu items`);
+      logger.info(`进度追踪已初始化。会话ID: ${this.sessionId}`);
+      logger.info(`本次共需测试 ${menus.length} 个菜单项`);
       
     } catch (error) {
-      logger.error(`Failed to initialize progress tracking: ${error.message}`);
+      logger.error(`进度追踪初始化失败: ${error.message}`);
       throw error;
     }
   }
@@ -112,7 +112,7 @@ class ProgressTracker {
     }
     
     await this.saveProgress();
-    logger.debug(`Step updated: ${step}`);
+    logger.debug(`步骤已更新: ${step}`);
   }
 
   /**
@@ -127,7 +127,7 @@ class ProgressTracker {
       
       await this.saveProgress();
       
-      logger.menu(`Starting test for menu: ${this.progress.menus[menuId].text}`);
+      logger.menu(`开始测试菜单: ${this.progress.menus[menuId].text}`);
     }
   }
 
@@ -148,10 +148,10 @@ class ProgressTracker {
       
       if (result.success) {
         this.progress.completedMenus += 1;
-        logger.success(`✓ Menu completed: ${menu.text} (${menu.duration}ms)`);
+        logger.success(`✓ 菜单完成: ${menu.text} (${menu.duration}ms)`);
       } else {
         this.progress.failedMenus += 1;
-        logger.error(`✗ Menu failed: ${menu.text} - ${result.error}`);
+        logger.error(`✗ 菜单失败: ${menu.text} - ${result.error}`);
         
         // Track error
         this.progress.errors.push({
@@ -181,7 +181,7 @@ class ProgressTracker {
       
       await this.saveProgress();
       
-      logger.warning(`Skipped menu: ${this.progress.menus[menuId].text} - ${reason}`);
+      logger.warning(`已跳过菜单: ${this.progress.menus[menuId].text} - ${reason}`);
     }
   }
 
@@ -197,7 +197,7 @@ class ProgressTracker {
     
     await this.saveProgress();
     
-    logger.success(`\nSession completed! Total duration: ${this.formatDuration(this.progress.duration)}`);
+    logger.success(`\n会话完成！总耗时: ${this.formatDuration(this.progress.duration)}`);
     this.displayFinalSummary();
   }
 
@@ -213,7 +213,7 @@ class ProgressTracker {
     
     await this.saveProgress();
     
-    logger.error(`Session failed: ${error.message}`);
+    logger.error(`会话失败: ${error.message}`);
   }
 
   /**
@@ -223,7 +223,7 @@ class ProgressTracker {
     try {
       await fs.writeJson(this.progressFile, this.progress, { spaces: 2 });
     } catch (error) {
-      logger.debug(`Failed to save progress: ${error.message}`);
+      logger.debug(`保存进度失败: ${error.message}`);
     }
   }
 
@@ -237,20 +237,20 @@ class ProgressTracker {
       const progressFile = path.join(this.outputDir, `session-${sessionId}.json`);
       
       if (!await fs.pathExists(progressFile)) {
-        throw new Error(`Session ${sessionId} not found`);
+        throw new Error(`未找到会话: ${sessionId}`);
       }
       
       const loadedProgress = await fs.readJson(progressFile);
       
       // Validate progress structure
       if (!loadedProgress.sessionId || !loadedProgress.menus) {
-        throw new Error('Invalid session file format');
+        throw new Error('会话文件格式不正确');
       }
       
       return loadedProgress;
       
     } catch (error) {
-      logger.error(`Failed to load progress: ${error.message}`);
+      logger.error(`加载会话失败: ${error.message}`);
       return null;
     }
   }
@@ -299,7 +299,7 @@ class ProgressTracker {
     this.sessionId = loadedProgress.sessionId;
     this.progressFile = path.join(this.outputDir, `session-${this.sessionId}.json`);
     
-    logger.info(`Resumed session: ${this.sessionId}`);
+    logger.info(`已恢复会话: ${this.sessionId}`);
     this.displayProgress();
   }
 
@@ -317,11 +317,11 @@ class ProgressTracker {
     
     const progressBar = this.createProgressBar(percentage);
     
-    logger.info(`\nProgress [${progressBar}] ${percentage}%`);
-    logger.info(`  Completed: ${completed}, Failed: ${failed}, Skipped: ${skipped}, Pending: ${pending}`);
+    logger.info(`\n进度 [${progressBar}] ${percentage}%`);
+    logger.info(`  已完成: ${completed}, 失败: ${failed}, 已跳过: ${skipped}, 待测: ${pending}`);
     
     if (this.progress.currentStep) {
-      logger.info(`  Current step: ${this.progress.currentStep}`);
+      logger.info(`  当前步骤: ${this.progress.currentStep}`);
     }
   }
 
@@ -333,19 +333,19 @@ class ProgressTracker {
     const successRate = totalMenus > 0 ? Math.round(completedMenus / totalMenus * 100) : 0;
     
     logger.info('\n' + '='.repeat(50));
-    logger.info(logger.bold('MENU TESTING SUMMARY'));
+    logger.info(logger.bold('菜单测试汇总'));
     logger.info('='.repeat(50));
-    logger.info(`Total menus: ${totalMenus}`);
-    logger.info(`✓ Completed: ${completedMenus}`);
-    logger.info(`✗ Failed: ${failedMenus}`);
-    logger.info(`⊝ Skipped: ${skippedMenus}`);
-    logger.info(`Success rate: ${successRate}%`);
-    logger.info(`Duration: ${this.formatDuration(duration)}`);
-    logger.info(`Session ID: ${this.sessionId}`);
+    logger.info(`菜单总数: ${totalMenus}`);
+    logger.info(`✓ 已完成: ${completedMenus}`);
+    logger.info(`✗ 失败: ${failedMenus}`);
+    logger.info(`⊝ 已跳过: ${skippedMenus}`);
+    logger.info(`成功率: ${successRate}%`);
+    logger.info(`总耗时: ${this.formatDuration(duration)}`);
+    logger.info(`会话ID: ${this.sessionId}`);
     logger.info('='.repeat(50));
     
     if (this.progress.errors.length > 0) {
-      logger.info('\nErrors encountered:');
+      logger.info('\n错误明细:');
       this.progress.errors.forEach((error, index) => {
         logger.error(`  ${index + 1}. ${error.menuText}: ${error.error}`);
       });
@@ -369,10 +369,10 @@ class ProgressTracker {
    * @returns {string} Formatted duration
    */
   formatDuration(ms) {
-    if (ms < 1000) return `${ms}ms`;
-    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-    if (ms < 3600000) return `${(ms / 60000).toFixed(1)}m`;
-    return `${(ms / 3600000).toFixed(1)}h`;
+    if (ms < 1000) return `${ms}毫秒`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}秒`;
+    if (ms < 3600000) return `${(ms / 60000).toFixed(1)}分钟`;
+    return `${(ms / 3600000).toFixed(1)}小时`;
   }
 
   /**

@@ -21,7 +21,7 @@ class PageValidator {
     const startTime = Date.now();
     
     try {
-      logger.debug(`Validating page load for menu: ${menu.text}`);
+      logger.debug(`校验页面加载: ${menu.text}`);
 
       // Wait for potential navigation
       await this.waitForNavigation();
@@ -77,7 +77,7 @@ class PageValidator {
       const isCrossDomain = isInitialInMainDomain && !isCurrentInMainDomain;
       
       if (isCrossDomain) {
-        logger.debug(`Cross-domain navigation detected: ${initialUrl} → ${currentUrl}`);
+        logger.debug(`检测到跨域导航: ${initialUrl} → ${currentUrl}`);
       }
       
       return {
@@ -87,7 +87,7 @@ class PageValidator {
         targetSystem: this.extractSystemName(currentUrl)
       };
     } catch (error) {
-      logger.debug(`Cross-domain detection failed: ${error.message}`);
+      logger.debug(`跨域检测失败: ${error.message}`);
       return { isCrossDomain: false, initialUrl, currentUrl };
     }
   }
@@ -126,7 +126,7 @@ class PageValidator {
    */
   async handleCrossDomainNavigation(menu, initialUrl, currentUrl, startTime) {
     try {
-      logger.info(`Menu "${menu.text}" navigated to external system: ${this.extractSystemName(currentUrl)}`);
+      logger.info(`菜单 "${menu.text}" 跳转到外部系统: ${this.extractSystemName(currentUrl)}`);
       
       // 尝试返回主系统
       const returnResult = await this.handleCrossDomainReturn(initialUrl);
@@ -153,7 +153,7 @@ class PageValidator {
       
       return {
         success: false,
-        error: `Cross-domain navigation handling failed: ${error.message}`,
+        error: `跨域导航处理失败: ${error.message}`,
         errorType: 'cross_domain_error',
         isCrossDomain: true,
         targetSystem: this.extractSystemName(currentUrl),
@@ -175,7 +175,7 @@ class PageValidator {
       attempt++;
       
       try {
-        logger.debug(`Attempting to return to main system (attempt ${attempt}/${this.maxReturnAttempts})`);
+        logger.debug(`尝试返回主系统（第 ${attempt}/${this.maxReturnAttempts} 次）`);
         
         // 策略1: 尝试浏览器后退
         if (attempt === 1) {
@@ -198,7 +198,7 @@ class PageValidator {
         // 验证是否成功返回主系统
         const currentUrl = await this.getCurrentUrl();
         if (this.isWithinMainDomain(currentUrl)) {
-          logger.success(`Successfully returned to main system via ${attempt === 1 ? 'goBack' : 'direct navigation'}`);
+          logger.success(`已返回主系统（方式：${attempt === 1 ? '后退' : '直接导航'}）`);
           return { success: true, method: attempt === 1 ? 'goBack' : 'directNavigation' };
         }
         
@@ -207,7 +207,7 @@ class PageValidator {
       }
     }
     
-    logger.warning('Failed to return to main system after all attempts');
+    logger.warning('多次尝试仍未返回主系统');
     return { success: false, attempts: this.maxReturnAttempts };
   }
 
@@ -216,49 +216,49 @@ class PageValidator {
    */
   async waitForNavigation() {
     try {
-      // Wait for network activity to settle
+      // 等待网络活动稳定
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Check if page is still loading
+      // 检查是否仍在加载
       const isLoading = await this.agent.aiBoolean(
         '页面是否还在加载中（显示加载动画或加载指示器）'
       );
 
       if (isLoading) {
-        // Wait up to 3 more seconds for loading to complete
+        // 最多再等 3 秒以完成加载
         await this.agent.aiWaitFor(
           '页面加载完成（没有加载动画）',
           { timeout: 3000 }
         );
       }
     } catch (error) {
-      logger.debug(`Navigation wait failed: ${error.message}`);
+      logger.debug(`导航等待失败: ${error.message}`);
     }
   }
 
   /**
-   * Perform quick validation of page state
-   * @param {object} menu - Menu item that was clicked
-   * @param {string} initialUrl - URL before menu click
-   * @returns {object} Validation result
+   * 快速校验页面状态
+   * @param {object} menu - 点击的菜单项
+   * @param {string} initialUrl - 点击前的URL
+   * @returns {object} 校验结果
    */
   async performQuickValidation(menu, initialUrl) {
-    // Check for error pages first (fastest check)
+          // 优先检查常见错误页（最快）
     const errorCheck = await this.checkForErrorPage();
     if (!errorCheck.success) {
       return errorCheck;
     }
 
-    // Check for basic page functionality
+    // 检查页面基础可用性
     const basicCheck = await this.checkBasicPageFunction();
     if (!basicCheck.success) {
       return basicCheck;
     }
 
-    // Check if we navigated to a different page or content changed
+    // 检查是否发生了跳转或内容变化
     const navigationCheck = await this.checkNavigation(initialUrl);
     
-    // Determine success based on navigation or content change
+    // 根据跳转或内容变化判定成功
     const success = navigationCheck.navigated || navigationCheck.contentChanged;
     
     return {
@@ -274,8 +274,8 @@ class PageValidator {
   }
 
   /**
-   * Create timeout result for race condition
-   * @returns {Promise<object>} Timeout result after 1 second
+   * 为竞态创建超时结果
+   * @returns {Promise<object>} 1秒后的超时结果
    */
   async createTimeoutResult() {
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -290,8 +290,8 @@ class PageValidator {
   }
 
   /**
-   * Check for common error pages
-   * @returns {object} Error check result
+   * 检查常见错误页面
+   * @returns {object} 错误检查结果
    */
   async checkForErrorPage() {
     try {
@@ -312,7 +312,7 @@ class PageValidator {
         
         return {
           success: false,
-          error: errorMessage || 'Unknown error page detected',
+          error: errorMessage || '检测到错误页面',
           errorType: 'error_page',
           hasErrors: true
         };
@@ -320,14 +320,14 @@ class PageValidator {
 
       return { success: true };
     } catch (error) {
-      logger.debug(`Error page check failed: ${error.message}`);
+      logger.debug(`错误页面检查失败: ${error.message}`);
       return { success: true }; // Assume no error if check fails
     }
   }
 
   /**
-   * Get specific error message from error page
-   * @returns {string} Error message or null
+   * 从错误页面提取具体错误信息
+   * @returns {string} 错误信息或 null
    */
   async getErrorMessage() {
     try {
@@ -338,14 +338,14 @@ class PageValidator {
 
       return typeof errorMessage === 'string' ? errorMessage : null;
     } catch (error) {
-      logger.debug(`Failed to extract error message: ${error.message}`);
+      logger.debug(`提取错误信息失败: ${error.message}`);
       return null;
     }
   }
 
   /**
-   * Check basic page functionality
-   * @returns {object} Basic function check result
+   * 检查页面基础功能
+   * @returns {object} 基础功能检查结果
    */
   async checkBasicPageFunction() {
     try {
@@ -361,7 +361,7 @@ class PageValidator {
       if (!hasBasicFunction) {
         return {
           success: false,
-          error: 'Page appears to be blank or not functioning properly',
+          error: '页面疑似空白或异常',
           errorType: 'blank_page',
           hasErrors: true
         };
@@ -369,23 +369,23 @@ class PageValidator {
 
       return { success: true };
     } catch (error) {
-      logger.debug(`Basic function check failed: ${error.message}`);
+      logger.debug(`基础功能检测失败: ${error.message}`);
       return { success: true }; // Assume success if check fails
     }
   }
 
   /**
-   * Check if navigation occurred or content changed
-   * @param {string} initialUrl - URL before menu click
-   * @returns {object} Navigation check result
+   * 检查是否发生导航或内容变化
+   * @param {string} initialUrl - 点击前的URL
+   * @returns {object} 检查结果
    */
   async checkNavigation(initialUrl) {
     try {
-      // Get current URL
+      // 获取当前 URL
       const currentUrl = await this.getCurrentUrl();
       const navigated = currentUrl !== initialUrl;
 
-      // If URL didn't change, check if content changed (SPA behavior)
+      // 如果 URL 未变化，检查是否是 SPA 内容变化
       let contentChanged = false;
       if (!navigated) {
         contentChanged = await this.checkContentChange();
@@ -398,7 +398,7 @@ class PageValidator {
         initialUrl
       };
     } catch (error) {
-      logger.debug(`Navigation check failed: ${error.message}`);
+      logger.debug(`导航检查失败: ${error.message}`);
       return {
         navigated: false,
         contentChanged: false,
@@ -409,15 +409,15 @@ class PageValidator {
   }
 
   /**
-   * Get current page URL
-   * @returns {string} Current URL
+   * 获取当前页面 URL
+   * @returns {string} 当前 URL
    */
   async getCurrentUrl() {
     try {
-      // Get URL from the page through the agent's page context
+      // 通过 agent 的 page 获取 URL
       return await this.agent.page.url();
     } catch (error) {
-      logger.debug(`Failed to get current URL: ${error.message}`);
+      logger.debug(`获取当前 URL 失败: ${error.message}`);
       return 'unknown';
     }
   }

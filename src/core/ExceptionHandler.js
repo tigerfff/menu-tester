@@ -5,7 +5,7 @@ class ExceptionHandler {
     this.agent = agent;
     this.config = config;
     this.maxRetries = config.retry || 2;
-    this.retryDelay = 1000; // 1 second delay between retries
+    this.retryDelay = 1000; // 每次重试之间等待 1 秒
   }
 
   /**
@@ -15,23 +15,23 @@ class ExceptionHandler {
    * @param {string} operation - 操作描述
    * @returns {Promise<object>} 包含成功状态和数据的结果
    */
-  async executeWithRetry(fn, context = {}, operation = 'operation') {
+  async executeWithRetry(fn, context = {}, operation = '操作') {
     let lastError = null;
     let attempt = 0;
 
     while (attempt <= this.maxRetries) {
       try {
-        logger.debug(`${operation} - Attempt ${attempt + 1}/${this.maxRetries + 1}`);
+        logger.debug(`${operation} - 第 ${attempt + 1}/${this.maxRetries + 1} 次尝试`);
         
-        // Handle page exceptions only when necessary (first attempt or forced)
+        // 仅在需要时处理页面异常（首次或强制检查）
         if (attempt === 0 || context.forcePageExceptionCheck) {
           await this.handlePageExceptions();
         }
         
-        // Execute the function
+        // 执行函数
         const result = await fn();
         
-        // If successful, return result
+        // 成功则返回结果
         return {
           success: true,
           data: result,
@@ -43,30 +43,30 @@ class ExceptionHandler {
         lastError = error;
         attempt++;
         
-        logger.warning(`${operation} failed on attempt ${attempt}: ${error.message}`);
+        logger.warning(`${operation} 第 ${attempt} 次尝试失败: ${error.message}`);
         
         // Handle specific exceptions
         const handled = await this.handleSpecificException(error, context);
         
         if (handled.recovered && attempt <= this.maxRetries) {
-          logger.info(`Exception handled, retrying ${operation}...`);
+          logger.info(`异常已处理，准备重试 ${operation}...`);
           await this.delay(this.retryDelay);  
           continue;
         }
         
         if (attempt <= this.maxRetries) {
-          logger.info(`Retrying ${operation} in ${this.retryDelay}ms...`);
+          logger.info(`${this.retryDelay}ms 后重试 ${operation}...`);
           await this.delay(this.retryDelay);
         }
       }
     }
 
-    // All retries exhausted
+    // 所有重试已用尽
     return {
       success: false,
       data: null,
       attempt: attempt,
-      error: lastError?.message || 'Unknown error'
+      error: lastError?.message || '未知错误'
     };
   }
 
@@ -75,12 +75,12 @@ class ExceptionHandler {
    */
   async handlePageExceptions() {
     try {
-      // Check for and handle common page issues
+      // 检查并处理常见页面问题
       await this.handlePopups();
       await this.handlePageErrors();
       await this.handleNetworkIssues();
     } catch (error) {
-      logger.debug(`Page exception handling failed: ${error.message}`);
+      logger.debug(`页面异常处理失败: ${error.message}`);
     }
   }
 
