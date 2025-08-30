@@ -48,9 +48,9 @@ class MenuTester {
       
       // Initialize core modules
       this.menuDiscovery = new MenuDiscovery(this.agent, this.config);
-      this.pageValidator = new PageValidator(this.agent, this.config);
-      this.exceptionHandler = new ExceptionHandler(this.agent, this.config);
-      this.menuNavigator = new MenuNavigator(this.agent, this.config);
+      this.pageValidator = new PageValidator(this.agent, this.page, this.config);
+      this.exceptionHandler = new ExceptionHandler(this.agent, this.page, this.config);
+      this.menuNavigator = new MenuNavigator(this.agent, this.page, this.config);
       
       // Navigate to target URL and inject token
       await this.setupPage();
@@ -934,8 +934,9 @@ class MenuTester {
       await this.initializeBrowser();
       this.tokenInjector = new TokenInjector(this.config);
       this.menuDiscovery = new MenuDiscovery(this.agent, this.config);
-      this.pageValidator = new PageValidator(this.agent, this.config);
-      this.exceptionHandler = new ExceptionHandler(this.agent, this.config);
+      this.pageValidator = new PageValidator(this.agent, this.page, this.config);
+      this.exceptionHandler = new ExceptionHandler(this.agent, this.page, this.config);
+      this.menuNavigator = new MenuNavigator(this.agent, this.page, this.config);
       
       // Setup page
       await this.setupPage();

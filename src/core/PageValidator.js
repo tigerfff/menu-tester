@@ -1,8 +1,9 @@
 const { logger } = require('../utils/logger');
 
 class PageValidator {
-  constructor(agent, config) {
+  constructor(agent, page, config) {
     this.agent = agent;
+    this.page = page;
     this.config = config;
     this.timeout = config.timeout || 6000;
     // 定义主域名模式
@@ -42,7 +43,7 @@ class PageValidator {
       ]);
 
       const duration = Date.now() - startTime;
-      
+        
       return {
         ...validationResult,
         duration,
@@ -56,7 +57,7 @@ class PageValidator {
         success: false,
         error: error.message,
         errorType: 'validation_error',
-        duration,
+        duration, 
         timestamp: new Date().toISOString()
       };
     }
@@ -144,7 +145,7 @@ class PageValidator {
         isCrossDomain: true,
         targetSystem: this.extractSystemName(currentUrl),
         returnSuccess: returnResult.success,
-        duration,
+        duration, 
         timestamp: new Date().toISOString()
       };
       
@@ -179,14 +180,14 @@ class PageValidator {
         
         // 策略1: 尝试浏览器后退
         if (attempt === 1) {
-          await this.agent.page.goBack({ 
+          await this.page.goBack({ 
             waitUntil: 'networkidle',
-            timeout: this.crossDomainTimeout 
+            timeout: this.crossDomainTimeout    
           });
         }
         // 策略2: 直接导航到目标URL
         else {
-          await this.agent.page.goto(targetUrl, {
+          await this.page.goto(targetUrl, {
             waitUntil: 'networkidle',
             timeout: this.crossDomainTimeout
           });
@@ -415,7 +416,7 @@ class PageValidator {
   async getCurrentUrl() {
     try {
       // 通过 agent 的 page 获取 URL
-      return await this.agent.page.url();
+      return await this.page.url();
     } catch (error) {
       logger.debug(`获取当前 URL 失败: ${error.message}`);
       return 'unknown';
