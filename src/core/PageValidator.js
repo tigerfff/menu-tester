@@ -279,7 +279,7 @@ class PageValidator {
    * @returns {Promise<object>} 1秒后的超时结果
    */
   async createTimeoutResult() {
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 5000));
     
     return {
       success: false,

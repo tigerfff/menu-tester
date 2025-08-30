@@ -87,48 +87,60 @@ class MenuNavigator {
   }
 
   /**
-   * 确保"更多"菜单处于展开状态
+   * 确保"更多"菜单处于展开状态（使用DOM操作）
    */
   async ensureMoreMenuExpanded() {
-    if (this.moreMenuState.isExpanded) {
-      logger.debug('"更多"菜单已展开');
-      return; // 已经展开
-    }
-    
     try {
-      // 检查"更多"按钮的当前状态
-      const moreButtonText = await this.getCurrentMoreButtonText();
+      // 1. 检查更多按钮是否存在
+      const moreButtonExists = await this.page.locator('#nav_top_menu_more').count() > 0;
       
-      if (moreButtonText === '更多' || moreButtonText.includes('更多')) {
-        // 标准状态，直接点击展开
-        await this.agent.aiTap('点击"更多"按钮展开下拉菜单');
-        logger.debug('点击"更多"按钮展开菜单');
-      } else {
-        // "更多"按钮显示的是某个菜单名，需要先点击展开
-        await this.agent.aiTap(`点击显示为"${moreButtonText}"的更多按钮以展开下拉菜单`);
-        logger.debug(`点击显示为"${moreButtonText}"的更多按钮`);
+      if (!moreButtonExists) {
+        logger.debug('更多按钮不存在，跳过展开');
+        return;
       }
       
-      this.moreMenuState.isExpanded = true;
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 2. 检查是否已经展开（检查内部 i 标签的 rotate 类）
+      const isExpanded = await this.page.locator('#nav_top_menu_more i.rotate').count() > 0;
+      
+      if (isExpanded) {
+        logger.debug('更多菜单已展开（检测到内部 i 标签的 rotate 类）');
+        this.moreMenuState.isExpanded = true;
+        return;
+      }
+      
+      // 3. 点击展开更多菜单
+      logger.debug('点击展开更多菜单...');
+      await this.page.locator('#nav_top_menu_more').click();
+      
+      // 4. 等待展开动画完成（等待内部 i 标签的 rotate 类出现）
+      try {
+        await this.page.locator('#nav_top_menu_more i.rotate').waitFor({ timeout: 2000 });
+        this.moreMenuState.isExpanded = true;
+        logger.debug('更多菜单展开成功');
+      } catch (waitError) {
+        // 如果没有rotate类，可能展开方式不同，再等一下
+        logger.debug('未检测到rotate类，使用备用等待方式');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        this.moreMenuState.isExpanded = true;
+      }
       
     } catch (error) {
-      logger.debug(`展开"更多"菜单失败: ${error.message}`);
+      logger.debug(`展开更多菜单失败: ${error.message}`);
+      // 即使失败也不抛错，让后续流程继续
     }
   }
 
   /**
-   * 获取当前"更多"按钮的文本
+   * 获取当前"更多"按钮的文本（使用DOM操作）
    * @returns {string} 按钮文本
    */
   async getCurrentMoreButtonText() {
     try {
-      const buttonText = await this.agent.aiQuery(`
-        string,
-        获取顶部导航栏中"更多"按钮当前显示的文本内容
-      `);
-      return buttonText || '更多';
+      // 获取 select-name span 中的文本内容（当前选中的菜单名）
+      const buttonText = await this.page.locator('#nav_top_menu_more .select-name').textContent();
+      return buttonText?.trim() || '更多';
     } catch (error) {
+      logger.debug(`获取更多按钮文本失败: ${error.message}`);
       return '更多';
     }
   }
