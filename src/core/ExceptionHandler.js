@@ -1,8 +1,9 @@
 const { logger } = require('../utils/logger');
 
 class ExceptionHandler {
-  constructor(agent, config) {
+  constructor(agent, page, config) {
     this.agent = agent;
+    this.page = page; // 直接使用传入的 page 对象
     this.config = config;
     this.maxRetries = config.retry || 2;
     this.retryDelay = 1000; // 每次重试之间等待 1 秒
@@ -368,8 +369,8 @@ class ExceptionHandler {
    */
   async refreshPage() {
     try {
-      // Get page object from agent and refresh
-      await this.agent.page.reload({ waitUntil: 'networkidle' });
+      // 直接使用传入的 page 对象
+      await this.page.reload({ waitUntil: 'networkidle' });
       
       // Wait for page to load after refresh
       await this.delay(3000);
@@ -387,8 +388,8 @@ class ExceptionHandler {
    */
   async navigateToUrl(url) {
     try {
-      // Get page object from agent and navigate
-      await this.agent.page.goto(url, { waitUntil: 'networkidle' });
+      // 直接使用传入的 page 对象
+      await this.page.goto(url, { waitUntil: 'networkidle' });
       
       // Wait for navigation to complete
       await this.delay(2000);

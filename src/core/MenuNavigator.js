@@ -5,8 +5,9 @@ const { logger } = require('../utils/logger');
  * 解决"更多"菜单状态变化导致的导航问题
  */
 class MenuNavigator {
-  constructor(agent, config) {
+  constructor(agent, page, config) {
     this.agent = agent;
+    this.page = page; // 直接使用传入的 page 对象
     this.config = config;
     this.moreMenuState = {
       isExpanded: false,
@@ -187,7 +188,7 @@ class MenuNavigator {
       logger.debug(`返回上一级，从 "${lastNavigation.menu.text}"`);
       
       // 尝试浏览器后退
-      await this.agent.page.goBack({ waitUntil: 'networkidle', timeout: 3000 });
+      await this.page.goBack({ waitUntil: 'networkidle', timeout: 3000 });
       
       this.currentPage = lastNavigation.fromPage;
       
@@ -205,7 +206,7 @@ class MenuNavigator {
       const homeUrl = this.config.url;
       logger.debug(`导航到首页: ${homeUrl}`);
       
-      await this.agent.page.goto(homeUrl, { 
+      await this.page.goto(homeUrl, { 
         waitUntil: 'networkidle', 
         timeout: this.config.timeout 
       });

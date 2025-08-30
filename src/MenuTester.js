@@ -47,7 +47,7 @@ class MenuTester {
       this.tokenInjector = new TokenInjector(this.config);
       
       // Initialize core modules
-      this.menuDiscovery = new MenuDiscovery(this.agent, this.config);
+      this.menuDiscovery = new MenuDiscovery(this.agent, this.page, this.config);
       this.pageValidator = new PageValidator(this.agent, this.page, this.config);
       this.exceptionHandler = new ExceptionHandler(this.agent, this.page, this.config);
       this.menuNavigator = new MenuNavigator(this.agent, this.page, this.config);
@@ -933,7 +933,7 @@ class MenuTester {
       // Initialize browser and modules
       await this.initializeBrowser();
       this.tokenInjector = new TokenInjector(this.config);
-      this.menuDiscovery = new MenuDiscovery(this.agent, this.config);
+      this.menuDiscovery = new MenuDiscovery(this.agent, this.page, this.config);
       this.pageValidator = new PageValidator(this.agent, this.page, this.config);
       this.exceptionHandler = new ExceptionHandler(this.agent, this.page, this.config);
       this.menuNavigator = new MenuNavigator(this.agent, this.page, this.config);

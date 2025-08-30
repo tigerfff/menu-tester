@@ -4,8 +4,9 @@ const MORE_TRIGGER = '#nav_top_menu_more'; // 顶部“更多”固定锚点
 const SIDEBAR_SELECTOR = '.el-menu.el-menu-vertical'; // 左侧菜单根容器选择器
 
 class MenuDiscovery {
-  constructor(agent, config) {
+  constructor(agent, page, config) {
     this.agent = agent;
+    this.page = page; // 直接使用传入的 page 对象
     this.config = config;
     this.skipPatterns = this.parsePatterns(config.skip);
     this.includePatterns = this.parsePatterns(config.include);
@@ -73,10 +74,10 @@ class MenuDiscovery {
   async ensureMoreOpen() {
     try {
       // 优先用 DOM 精确判断，避免 AI 配额/回答误差
-      const page = this.agent?.page; // PlaywrightAgent 通常暴露 page
+      const page = this.page; // 直接使用传入的 page 对象
       if (page) {
         // 等待元素出现（短超时）
-        await page.waitForSelector('#nav_top_menu_more', { timeout: 1500 });
+        await page.locator('#nav_top_menu_more').waitFor({ timeout: 1500 });
 
         // 检查是否已展开：class 包含 selected 或 aria-expanded=true
         const isOpened = await page.evaluate(() => {
