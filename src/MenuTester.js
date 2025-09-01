@@ -222,19 +222,70 @@ class MenuTester {
       // 发现左侧菜单（主要的子菜单来源）
       const sidebarMenus = await this.menuDiscovery.discoverCurrentPageSubMenus();
       
-      // 构建完整的菜单对象
-      return sidebarMenus.map((menu, index) => ({
-        id: `${parentMenu.id}-child-${index}`,
-        text: menu.text,
-        level: currentLevel + 1,
-        parent: parentMenu,
-        path: [...(parentMenu.path || [parentMenu.text]), menu.text],
-        area: 'sidebar',
-        isDropdownItem: false,
-        tested: false,
-        success: null,
-        error: null
-      }));
+      // 处理子菜单：对于可展开的子菜单，先展开再发现其子项
+      const allSubMenus = [];
+      
+      for (const menu of sidebarMenus) {
+        if (menu.isSubmenu) {
+          // 如果是可展开的子菜单，先展开
+          logger.debug(`发现可展开子菜单: ${menu.text}，尝试展开...`);
+          const expanded = await this.menuDiscovery.expandSubMenu(menu.text);
+          
+          if (expanded) {
+            // 展开成功，发现展开后的子菜单项
+            const expandedSubItems = await this.menuDiscovery.discoverExpandedSubMenuItems(menu.text);
+            
+            // 将展开后的子菜单项添加到结果中
+            expandedSubItems.forEach((subItem, subIndex) => {
+              allSubMenus.push({
+                id: `${parentMenu.id}-child-${allSubMenus.length}`,
+                text: subItem.text,
+                level: currentLevel + 1,
+                parent: parentMenu,
+                path: [...(parentMenu.path || [parentMenu.text]), menu.text, subItem.text],
+                area: 'sidebar-sub',
+                isDropdownItem: false,
+                parentSubmenu: menu.text, // 标记父子菜单
+                tested: false,
+                success: null,
+                error: null
+              });
+            });
+          } else {
+            // 展开失败，将子菜单本身作为可点击项
+            allSubMenus.push({
+              id: `${parentMenu.id}-child-${allSubMenus.length}`,
+              text: menu.text,
+              level: currentLevel + 1,
+              parent: parentMenu,
+              path: [...(parentMenu.path || [parentMenu.text]), menu.text],
+              area: 'sidebar',
+              isDropdownItem: false,
+              isSubmenu: true,
+              tested: false,
+              success: null,
+              error: null
+            });
+          }
+        } else {
+          // 普通菜单项，直接添加
+          allSubMenus.push({
+            id: `${parentMenu.id}-child-${allSubMenus.length}`,
+            text: menu.text,
+            level: currentLevel + 1,
+            parent: parentMenu,
+            path: [...(parentMenu.path || [parentMenu.text]), menu.text],
+            area: 'sidebar',
+            isDropdownItem: false,
+            tested: false,
+            success: null,
+            error: null
+          });
+        }
+      }
+      
+      logger.debug(`总共发现 ${allSubMenus.length} 个子菜单项`);
+      return allSubMenus;
       
     } catch (error) {
       logger.debug(`发现 "${parentMenu.text}" 的子菜单失败: ${error.message}`);
