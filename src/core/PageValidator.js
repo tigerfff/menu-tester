@@ -431,24 +431,54 @@ class PageValidator {
   }
 
   /**
-   * Check if page content changed (for SPAs)
-   * @returns {boolean} Whether content changed
+   * 检查页面内容是否发生变化（快速 DOM 检查，不用 AI）
+   * @returns {boolean} 内容是否变化
    */
   async checkContentChange() {
     try {
-      // 简化内容变化检测，减少AI调用复杂度
-      const contentChanged = await this.agent.aiBoolean(`
-        页面的主要内容是否已经更新或变化了？
-      `);
-
+      // 使用快速的 DOM 检查替代 AI 调用
+      const contentChanged = await this.page.evaluate(() => {
+        // 检查是否有主要内容区域
+        const mainContent = document.querySelector('main, .main, .content, .container, .page-content');
+        if (mainContent && mainContent.textContent.trim().length > 50) {
+          return true;
+        }
+        
+        // 检查是否有标题
+        const title = document.querySelector('h1, h2, h3, .title, .page-title');
+        if (title && title.textContent.trim().length > 0) {
+          return true;
+        }
+        
+        // 检查是否有导航菜单
+        const nav = document.querySelector('nav, .nav, .menu, .sidebar');
+        if (nav && nav.children.length > 0) {
+          return true;
+        }
+        
+        // 检查是否有表格或列表内容
+        const table = document.querySelector('table, .table, .el-table');
+        if (table && table.rows && table.rows.length > 1) {
+          return true;
+        }
+        
+        // 检查是否有按钮或交互元素
+        const buttons = document.querySelectorAll('button, .btn, .el-button, input[type="submit"]');
+        if (buttons.length > 0) {
+          return true;
+        }
+        
+        return false;
+      });
+      
       if (contentChanged) {
-        logger.debug('检测到页面内容变化');
+        logger.debug('检测到页面内容变化（DOM检查）');
       }
-
+      
       return contentChanged;
     } catch (error) {
-      logger.debug(`Content change check failed: ${error.message}`);
-      // 如果AI检查失败，假设有变化（避免误判）
+      logger.debug(`内容变化检查失败: ${error.message}`);
+      // 如果检查失败，假设有变化（避免误判）
       return true;
     }
   }

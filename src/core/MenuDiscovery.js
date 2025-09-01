@@ -79,25 +79,28 @@ class MenuDiscovery {
         // 等待元素出现（短超时）
         await page.locator('#nav_top_menu_more').waitFor({ timeout: 1500 });
 
-        // 检查是否已展开：class 包含 selected 或 aria-expanded=true
+        // 检查是否已展开：内层 <i> 是否含 rotate 或 aria-expanded=true
         const isOpened = await page.evaluate(() => {
           const el = document.getElementById('nav_top_menu_more');
-          if (!el) return null;
+          if (!el) return false;
           const aria = el.getAttribute('aria-expanded');
-          return el.classList.contains('selected') || aria === 'true';
+          const icon = el.querySelector('i.h-icon-angle_down_sm');
+          return (icon && icon.classList.contains('rotate')) || aria === 'true';
         });
 
         if (isOpened === true) return true;
 
         // 未展开则点击展开（幂等）
-        await page.click('#nav_top_menu_more', { timeout: 1500 });
-        // 等待展开态生效
-        await page.waitForFunction(() => {
-          const el = document.getElementById('nav_top_menu_more');
-          if (!el) return false;
-          const aria = el.getAttribute('aria-expanded');
-          return el.classList.contains('selected') || aria === 'true';
-        }, { timeout: 1500 });
+        await page.locator('#nav_top_menu_more').click();
+        // 等待展开态生效（等待内层 i 标签的 rotate 类出现）
+        try {
+          await page.locator('#nav_top_menu_more i.rotate').waitFor({ timeout: 2000 });
+          logger.debug('更多菜单展开成功');
+        } catch (waitError) {
+          // 如果没有rotate类，使用备用等待方式
+          logger.debug('未检测到rotate类，使用备用等待方式');
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
 
         await new Promise(r => setTimeout(r, 300));
         return true;
