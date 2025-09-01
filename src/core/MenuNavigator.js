@@ -140,7 +140,7 @@ class MenuNavigator {
       const buttonText = await this.page.locator('#nav_top_menu_more .select-name').textContent();
       return buttonText?.trim() || '更多';
     } catch (error) {
-      logger.debug(`获取更多按钮文本失败: ${error.message}`);
+      logger.debug(`获取更多按钮文本失败: ${error.message}`);   
       return '更多';
     }
   }

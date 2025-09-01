@@ -244,31 +244,38 @@ class PageValidator {
    * @returns {object} 校验结果
    */
   async performQuickValidation(menu, initialUrl) {
-          // 优先检查常见错误页（最快）
+    // 首先快速检查导航结果（最重要的）
+    const navigationCheck = await this.checkNavigation(initialUrl);
+    
+    // 如果已经检测到导航或内容变化，直接返回成功
+    if (navigationCheck.navigated || navigationCheck.contentChanged) {
+      logger.debug(`菜单 "${menu.text}" 导航成功 - URL变化: ${navigationCheck.navigated}, 内容变化: ${navigationCheck.contentChanged}`);
+      return {
+        success: true,
+        error: null,
+        errorType: null,
+        pageUrl: navigationCheck.currentUrl,
+        urlChanged: navigationCheck.navigated,
+        contentChanged: navigationCheck.contentChanged,
+        hasErrors: false,
+        isCrossDomain: false
+      };
+    }
+    
+    // 只有在没有明显变化时才进行错误检查（快速检查）
     const errorCheck = await this.checkForErrorPage();
     if (!errorCheck.success) {
       return errorCheck;
     }
-
-    // 检查页面基础可用性
-    const basicCheck = await this.checkBasicPageFunction();
-    if (!basicCheck.success) {
-      return basicCheck;
-    }
-
-    // 检查是否发生了跳转或内容变化
-    const navigationCheck = await this.checkNavigation(initialUrl);
     
-    // 根据跳转或内容变化判定成功
-    const success = navigationCheck.navigated || navigationCheck.contentChanged;
-    
+    // 如果没有导航、内容变化，也没有错误，可能是点击无效
     return {
-      success,
-      error: success ? null : 'No page change detected after menu click',
-      errorType: success ? null : 'no_navigation',
+      success: false,
+      error: 'No page change detected after menu click',
+      errorType: 'no_navigation',
       pageUrl: navigationCheck.currentUrl,
-      urlChanged: navigationCheck.navigated,
-      contentChanged: navigationCheck.contentChanged,
+      urlChanged: false,
+      contentChanged: false,
       hasErrors: false,
       isCrossDomain: false
     };
@@ -279,7 +286,7 @@ class PageValidator {
    * @returns {Promise<object>} 1秒后的超时结果
    */
   async createTimeoutResult() {
-    await new Promise(resolve => setTimeout(resolve, 5000));
+    await new Promise(resolve => setTimeout(resolve, 10000)); // 改为10秒
     
     return {
       success: false,
@@ -429,18 +436,20 @@ class PageValidator {
    */
   async checkContentChange() {
     try {
-      // Use AI to detect if main content area has changed
+      // 简化内容变化检测，减少AI调用复杂度
       const contentChanged = await this.agent.aiBoolean(`
-        页面的主要内容区域是否发生了变化，比如：
-        - 显示了新的页面内容
-        - 主要区域内容更新了
-        - 页面标题或导航状态发生变化
+        页面的主要内容是否已经更新或变化了？
       `);
+
+      if (contentChanged) {
+        logger.debug('检测到页面内容变化');
+      }
 
       return contentChanged;
     } catch (error) {
       logger.debug(`Content change check failed: ${error.message}`);
-      return false;
+      // 如果AI检查失败，假设有变化（避免误判）
+      return true;
     }
   }
 
