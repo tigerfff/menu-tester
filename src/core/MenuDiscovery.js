@@ -420,7 +420,7 @@ class MenuDiscovery {
       // 使用精确的 DOM 检查，避免误判顶部菜单
       const hasSidebar = await this.page.evaluate(() => {
         // 检查是否存在 el-menu 类的左侧菜单容器
-        const sidebarMenu = document.querySelector('.el-menu.el-menu-vertical, .el-menu-vertical, .el-menu');
+        const sidebarMenu = document.querySelector('.el-menu.el-menu-vertical');
         if (!sidebarMenu) {
           return false;
         }
@@ -438,34 +438,66 @@ class MenuDiscovery {
         return [];
       }
       
-      // 直接从 DOM 获取左侧菜单项，避免 AI 误判
+      // 直接从 DOM 获取左侧菜单项，包括需要展开的子菜单
       const sidebarMenus = await this.page.evaluate(() => {
-        const sidebarMenu = document.querySelector('.el-menu.el-menu-vertical, .el-menu-vertical, .el-menu');
+        const sidebarMenu = document.querySelector('.el-menu.el-menu-vertical');
         if (!sidebarMenu) return [];
         
-        const menuItems = sidebarMenu.querySelectorAll('.el-menu-item, .el-submenu__title, .menu-item');
         const menus = [];
         
-        menuItems.forEach((item, index) => {
-          const text = item.textContent?.trim();
+        // 获取所有一级菜单项（包括可展开的子菜单）
+        const topLevelItems = sidebarMenu.querySelectorAll('> li:not(.el-menu--colloase-btn)');
+        
+        topLevelItems.forEach((item, index) => {
+          // 跳过折叠按钮
+          if (item.classList.contains('el-menu--colloase-btn')) {
+            return;
+          }
+          
+          // 获取菜单文本
+          let text = '';
+          const textElement = item.querySelector('.el-menu-item--text, .el-submenu__title--text');
+          if (textElement) {
+            text = textElement.textContent?.trim() || '';
+          }
+          
           if (text && text.length > 0) {
             // 检查是否可见和可点击
             const isVisible = item.offsetParent !== null && 
                             item.style.display !== 'none' && 
                             item.style.visibility !== 'hidden';
             
-            const isClickable = !item.disabled && 
-                              !item.classList.contains('disabled') &&
-                              item.onclick !== null || 
-                              item.querySelector('a, button') !== null;
+            // 判断菜单类型
+            const isSubmenu = item.classList.contains('el-submenu');
+            const isMenuItem = item.classList.contains('el-menu-item');
+            
+            // 检查是否可点击
+            const isClickable = isVisible && (
+              isMenuItem || // 普通菜单项
+              (isSubmenu && item.querySelector('.el-submenu__title')) // 可展开的子菜单
+            );
+            
+            // 检查是否已展开
+            const isExpanded = isSubmenu && item.classList.contains('is-opened');
+            
+            // 获取子菜单数量（如果存在）
+            let subMenuCount = 0;
+            if (isSubmenu) {
+              const subMenu = item.querySelector('.el-menu');
+              if (subMenu) {
+                subMenuCount = subMenu.querySelectorAll('.el-menu-item, .el-submenu').length;
+              }
+            }
             
             menus.push({
               text: text,
               isVisible: isVisible,
               isClickable: isClickable,
-              isExpanded: item.classList.contains('is-active') || 
-                         item.classList.contains('expanded'),
-              element: item.outerHTML.substring(0, 100) // 保存部分HTML用于调试
+              isExpanded: isExpanded,
+              isSubmenu: isSubmenu,
+              isMenuItem: isMenuItem,
+              subMenuCount: subMenuCount,
+              element: item.outerHTML.substring(0, 150) // 保存部分HTML用于调试
             });
           }
         });
@@ -486,11 +518,20 @@ class MenuDiscovery {
           isVisible: menu.isVisible,
           isClickable: menu.isClickable,
           isExpanded: menu.isExpanded || false,
+          isSubmenu: menu.isSubmenu || false,
+          isMenuItem: menu.isMenuItem || false,
+          subMenuCount: menu.subMenuCount || 0,
           area: 'sidebar',
           debug: menu.element // 用于调试
         }));
       
       logger.debug(`发现 ${filteredMenus.length} 个左侧菜单项（DOM检查）`);
+      
+      // 输出调试信息
+      filteredMenus.forEach((menu, index) => {
+        logger.debug(`  ${index + 1}. ${menu.text} (${menu.isSubmenu ? '子菜单' : '菜单项'}, 子项数量: ${menu.subMenuCount})`);
+      });
+      
       return this.filterMenus(filteredMenus);
       
     } catch (error) {
@@ -500,73 +541,166 @@ class MenuDiscovery {
   }
 
   /**
-   * 检查当前页面是否有更深层的子菜单
-   * @param {object} menuItem - 当前菜单项
-   * @returns {boolean} 是否有子菜单
+   * 展开特定子菜单
+   * @param {string} menuText - 子菜单文本
+   * @returns {boolean} 是否成功展开
    */
-  async hasSubMenus(menuItem) {
+  async expandSubMenu(menuText) {
     try {
-      const hasSubMenus = await this.agent.aiBoolean(`
-        点击菜单项"${menuItem.text}"后，是否会显示更多的子菜单或下级菜单
-      `);
+      logger.debug(`展开子菜单: ${menuText}`);
       
-      return hasSubMenus;
+      const expanded = await this.page.evaluate((targetText) => {
+        const sidebarMenu = document.querySelector('.el-menu.el-menu-vertical');
+        if (!sidebarMenu) return false;
+        
+        // 找到对应的子菜单标题
+        const submenuTitles = sidebarMenu.querySelectorAll('.el-submenu__title--text');
+        for (const title of submenuTitles) {
+          if (title.textContent.trim() === targetText) {
+            const submenu = title.closest('.el-submenu');
+            if (submenu && !submenu.classList.contains('is-opened')) {
+              const titleElement = title.closest('.el-submenu__title');
+              if (titleElement) {
+                titleElement.click();
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      }, menuText);
+      
+      if (expanded) {
+        // 等待展开动画完成
+        await new Promise(resolve => setTimeout(resolve, 500));
+        logger.debug(`子菜单"${menuText}"展开成功`);
+        return true;
+      } else {
+        logger.debug(`子菜单"${menuText}"未找到或已展开`);
+        return false;
+      }
+      
     } catch (error) {
-      logger.debug(`检查菜单"${menuItem.text}"的子菜单失败: ${error.message}`);
+      logger.debug(`展开子菜单"${menuText}"失败: ${error.message}`);
       return false;
     }
   }
 
   /**
-   * 发现特定菜单项下的子菜单
-   * @param {object} parentMenu - 父菜单项
-   * @returns {Array} 子菜单列表
+   * 发现展开后的子菜单项
+   * @param {string} parentMenuText - 父菜单文本
+   * @returns {Array} 子菜单项列表
    */
-  async discoverSubMenusOf(parentMenu) {
+  async discoverExpandedSubMenuItems(parentMenuText) {
     try {
-      logger.debug(`发现菜单"${parentMenu.text}"的子菜单...`);
+      logger.debug(`发现展开后的子菜单项: ${parentMenuText}`);
       
-      // 检查是否有展开的子菜单
-      const hasExpandedSubMenus = await this.agent.aiBoolean(`
-        菜单项"${parentMenu.text}"是否已展开并显示了子菜单项
-      `);
+      const subMenuItems = await this.page.evaluate((parentText) => {
+        const sidebarMenu = document.querySelector('.el-menu.el-menu-vertical');
+        if (!sidebarMenu) return [];
+        
+        // 找到父菜单
+        const submenuTitles = sidebarMenu.querySelectorAll('.el-submenu__title--text');
+        let parentSubmenu = null;
+        
+        for (const title of submenuTitles) {
+          if (title.textContent.trim() === parentText) {
+            parentSubmenu = title.closest('.el-submenu');
+            break;
+          }
+        }
+        
+        if (!parentSubmenu || !parentSubmenu.classList.contains('is-opened')) {
+          return [];
+        }
+        
+        // 获取展开后的子菜单项
+        const subMenu = parentSubmenu.querySelector('.el-menu');
+        if (!subMenu) return [];
+        
+        const items = [];
+        const menuItems = subMenu.querySelectorAll('.el-menu-item, .el-submenu');
+        
+        menuItems.forEach((item, index) => {
+          let text = '';
+          const textElement = item.querySelector('.el-menu-item--text, .el-submenu__title--text');
+          if (textElement) {
+            text = textElement.textContent?.trim() || '';
+          }
+          
+          if (text && text.length > 0) {
+            const isVisible = item.offsetParent !== null && 
+                            item.style.display !== 'none' && 
+                            item.style.visibility !== 'hidden';
+            
+            const isSubmenu = item.classList.contains('el-submenu');
+            const isMenuItem = item.classList.contains('el-menu-item');
+            const isClickable = isVisible && (isMenuItem || isSubmenu);
+            
+            items.push({
+              text: text,
+              isVisible: isVisible,
+              isClickable: isClickable,
+              isSubmenu: isSubmenu,
+              isMenuItem: isMenuItem,
+              parentText: parentText,
+              level: 2 // 二级菜单
+            });
+          }
+        });
+        
+        return items;
+      }, parentMenuText);
       
-      if (!hasExpandedSubMenus) {
-        logger.debug(`菜单"${parentMenu.text}"无展开的子菜单`);
-        return [];
-      }
-      
-      const subMenuQuery = `
-        {
-          text: string,
-          isVisible: boolean,
-          isClickable: boolean,
-          level: number
-        }[],
-        列出菜单项"${parentMenu.text}"下所有可见的子菜单项
-      `;
-      
-      const subMenus = await this.agent.aiQuery(subMenuQuery);
-      
-      if (!Array.isArray(subMenus)) {
-        return [];
-      }
-      
-      return subMenus
-        .filter(menu => menu.isVisible && menu.isClickable && menu.text)
-        .map((menu, index) => ({
-          id: `${parentMenu.id}-sub-${index}`,
-          text: menu.text.trim(),
-          level: (menu.level || 2),
-          parent: parentMenu,
-          isVisible: menu.isVisible,
-          isClickable: menu.isClickable,
+      const filteredItems = subMenuItems
+        .filter(item => item.isVisible && item.isClickable && item.text)
+        .map((item, index) => ({
+          id: `submenu-${Date.now()}-${index}`,
+          text: item.text.trim(),
+          isVisible: item.isVisible,
+          isClickable: item.isClickable,
+          isSubmenu: item.isSubmenu || false,
+          isMenuItem: item.isMenuItem || false,
+          parentText: item.parentText,
+          level: item.level,
           area: 'sidebar-sub'
         }));
-        
+      
+      logger.debug(`在"${parentMenuText}"下发现 ${filteredItems.length} 个子菜单项`);
+      
+      return filteredItems;
+      
     } catch (error) {
-      logger.debug(`发现菜单"${parentMenu.text}"的子菜单失败: ${error.message}`);
+      logger.debug(`发现子菜单项失败: ${error.message}`);
       return [];
+    }
+  }
+
+  /**
+   * 检查子菜单是否已展开
+   * @param {string} menuText - 菜单文本
+   * @returns {boolean} 是否已展开
+   */
+  async isSubMenuExpanded(menuText) {
+    try {
+      const isExpanded = await this.page.evaluate((targetText) => {
+        const sidebarMenu = document.querySelector('.el-menu.el-menu-vertical');
+        if (!sidebarMenu) return false;
+        
+        const submenuTitles = sidebarMenu.querySelectorAll('.el-submenu__title--text');
+        for (const title of submenuTitles) {
+          if (title.textContent.trim() === targetText) {
+            const submenu = title.closest('.el-submenu');
+            return submenu && submenu.classList.contains('is-opened');
+          }
+        }
+        return false;
+      }, menuText);
+      
+      return isExpanded;
+    } catch (error) {
+      logger.debug(`检查子菜单展开状态失败: ${error.message}`);
+      return false;
     }
   }
 
