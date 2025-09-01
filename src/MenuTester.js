@@ -209,6 +209,80 @@ class MenuTester {
   }
 
   /**
+   * 递归展开和发现深层级菜单
+   * @param {Array} menuItems - 菜单项列表
+   * @param {object} parentMenu - 父菜单
+   * @param {number} currentLevel - 当前层级
+   * @param {number} maxDepth - 最大深度
+   * @returns {Array} 所有发现的菜单项
+   */
+  async discoverDeepMenusRecursively(menuItems, parentMenu, currentLevel, maxDepth = 3) {
+    const allDiscoveredMenus = [];
+    
+    for (const menu of menuItems) {
+      if (menu.isSubmenu && currentLevel < maxDepth) {
+        logger.debug(`尝试递归展开深层菜单: ${menu.text} (层级: ${currentLevel})`);
+        
+        // 确保菜单可见并展开
+        await this.menuDiscovery.ensureMenuVisible(menu.text);
+        const expanded = await this.menuDiscovery.expandSubMenu(menu.text);
+        
+        if (expanded) {
+          // 发现展开后的子菜单项
+          const subItems = await this.menuDiscovery.discoverExpandedSubMenuItems(menu.text);
+          
+          if (subItems.length > 0) {
+            // 递归处理子菜单项
+            const deepMenus = await this.discoverDeepMenusRecursively(
+              subItems, 
+              parentMenu, 
+              currentLevel + 1, 
+              maxDepth
+            );
+            
+            allDiscoveredMenus.push(...deepMenus);
+          }
+          
+          // 将子菜单项添加到结果中
+          subItems.forEach(subItem => {
+            allDiscoveredMenus.push({
+              id: `${parentMenu.id}-deep-${allDiscoveredMenus.length}`,
+              text: subItem.text,
+              level: currentLevel + 1,
+              parent: parentMenu,
+              path: [...(parentMenu.path || [parentMenu.text]), menu.text, subItem.text],
+              area: `sidebar-level-${currentLevel + 1}`,
+              isDropdownItem: false,
+              parentSubmenu: menu.text,
+              isSubmenu: subItem.isSubmenu || false,
+              tested: false,
+              success: null,
+              error: null
+            });
+          });
+        }
+      } else {
+        // 普通菜单项或已达到最大深度
+        allDiscoveredMenus.push({
+          id: `${parentMenu.id}-item-${allDiscoveredMenus.length}`,
+          text: menu.text,
+          level: currentLevel,
+          parent: parentMenu,
+          path: [...(parentMenu.path || [parentMenu.text]), menu.text],
+          area: `sidebar-level-${currentLevel}`,
+          isDropdownItem: false,
+          isSubmenu: menu.isSubmenu || false,
+          tested: false,
+          success: null,
+          error: null
+        });
+      }
+    }
+    
+    return allDiscoveredMenus;
+  }
+
+  /**
    * 发现当前页面的子菜单
    * @param {object} parentMenu - 父菜单
    * @param {number} currentLevel - 当前层级
@@ -222,69 +296,15 @@ class MenuTester {
       // 发现左侧菜单（主要的子菜单来源）
       const sidebarMenus = await this.menuDiscovery.discoverCurrentPageSubMenus();
       
-      // 处理子菜单：对于可展开的子菜单，先展开再发现其子项
-      const allSubMenus = [];
+      // 递归发现和展开深层级菜单
+      const allSubMenus = await this.discoverDeepMenusRecursively(
+        sidebarMenus, 
+        parentMenu, 
+        currentLevel + 1,
+        this.config.depth || 3
+      );
       
-      for (const menu of sidebarMenus) {
-        if (menu.isSubmenu) {
-          // 如果是可展开的子菜单，先展开
-          logger.debug(`发现可展开子菜单: ${menu.text}，尝试展开...`);
-          const expanded = await this.menuDiscovery.expandSubMenu(menu.text);
-          
-          if (expanded) {
-            // 展开成功，发现展开后的子菜单项
-            const expandedSubItems = await this.menuDiscovery.discoverExpandedSubMenuItems(menu.text);
-            
-            // 将展开后的子菜单项添加到结果中
-            expandedSubItems.forEach((subItem, subIndex) => {
-              allSubMenus.push({
-                id: `${parentMenu.id}-child-${allSubMenus.length}`,
-                text: subItem.text,
-                level: currentLevel + 1,
-                parent: parentMenu,
-                path: [...(parentMenu.path || [parentMenu.text]), menu.text, subItem.text],
-                area: 'sidebar-sub',
-                isDropdownItem: false,
-                parentSubmenu: menu.text, // 标记父子菜单
-                tested: false,
-                success: null,
-                error: null
-              });
-            });
-          } else {
-            // 展开失败，将子菜单本身作为可点击项
-            allSubMenus.push({
-              id: `${parentMenu.id}-child-${allSubMenus.length}`,
-              text: menu.text,
-              level: currentLevel + 1,
-              parent: parentMenu,
-              path: [...(parentMenu.path || [parentMenu.text]), menu.text],
-              area: 'sidebar',
-              isDropdownItem: false,
-              isSubmenu: true,
-              tested: false,
-              success: null,
-              error: null
-            });
-          }
-        } else {
-          // 普通菜单项，直接添加
-          allSubMenus.push({
-            id: `${parentMenu.id}-child-${allSubMenus.length}`,
-            text: menu.text,
-            level: currentLevel + 1,
-            parent: parentMenu,
-            path: [...(parentMenu.path || [parentMenu.text]), menu.text],
-            area: 'sidebar',
-            isDropdownItem: false,
-            tested: false,
-            success: null,
-            error: null
-          });
-        }
-      }
-      
-      logger.debug(`总共发现 ${allSubMenus.length} 个子菜单项`);
+      logger.debug(`总共发现 ${allSubMenus.length} 个子菜单项（包含深层级）`);
       return allSubMenus;
       
     } catch (error) {
@@ -903,7 +923,7 @@ class MenuTester {
       
       // 等待页面完全稳定（兼容没有 waitForLoadState 的环境）
       if (typeof this.page.waitForLoadState === 'function') {
-        await this.page.waitForLoadState('networkidle');
+      await this.page.waitForLoadState('networkidle');
       } else {
         await new Promise(resolve => setTimeout(resolve, 1500));
       }

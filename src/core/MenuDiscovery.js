@@ -410,7 +410,86 @@ class MenuDiscovery {
   }
 
   /**
-   * 发现当前页面的子菜单（边发现边测试模式）
+   * 确保菜单项在可视区域内（使用 Midscene API）
+   * @param {string} menuText - 菜单文本
+   */
+  async ensureMenuVisible(menuText) {
+    try {
+      logger.debug(`确保菜单"${menuText}"可见...`);
+      
+      // 使用 Midscene 的 aiScroll 方法滚动到目标菜单
+      await this.agent.aiScroll({
+        direction: 'down',
+        scrollType: 'untilElement',
+        locate: `菜单项"${menuText}"`
+      });
+      
+      // 等待滚动完成
+      await this.agent.aiWaitFor(`菜单项"${menuText}"清晰可见`, { timeout: 2000 });
+      
+      logger.debug(`菜单"${menuText}"现在可见`);
+      
+    } catch (error) {
+      logger.debug(`滚动到菜单"${menuText}"失败: ${error.message}`);
+      // 如果滚动失败，尝试简单等待
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  /**
+   * 滚动左侧菜单容器以发现更多菜单项（使用 Midscene API）
+   */
+  async scrollSidebarToDiscoverMore() {
+    try {
+      logger.debug('滚动侧边栏以发现更多菜单...');
+      
+      // 使用 Midscene 滚动侧边栏到底部
+      await this.agent.aiScroll({
+        direction: 'down',
+        scrollType: 'untilBottom',
+        locate: 'el-menu'
+      });
+      
+      // 等待可能的懒加载内容
+      await this.agent.aiWaitFor('页面内容稳定，没有加载动画', { timeout: 2000 });
+      
+      logger.debug('侧边栏滚动完成');
+      return true;
+      
+    } catch (error) {
+      logger.debug(`滚动侧边栏失败: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * 发现当前可见的菜单项
+   * @returns {Array} 可见的菜单项
+   */
+  async discoverVisibleMenuItems() {
+    try {
+      // 使用 Midscene AI 查询当前可见的菜单项
+      const visibleMenus = await this.agent.aiQuery(`
+        {
+          text: string,
+          isSubmenu: boolean
+        }[],
+        找到 el-menu 容器中当前屏幕可见区域内的所有菜单项，包括：
+        - 普通菜单项（el-menu-item）
+        - 可展开的子菜单（el-submenu）
+        只返回完全可见的菜单项，返回菜单文本和是否为子菜单
+      `);
+      
+      return Array.isArray(visibleMenus) ? visibleMenus : [];
+      
+    } catch (error) {
+      logger.debug(`发现可见菜单项失败: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * 发现当前页面的子菜单（支持滚动发现）
    * @returns {Array} 当前页面的子菜单列表
    */
   async discoverCurrentPageSubMenus() {
@@ -427,24 +506,48 @@ class MenuDiscovery {
         return [];
       }
       
-      // 使用 Midscene AI 查询获取菜单项
-      const sidebarMenus = await this.agent.aiQuery(`
-        {
-          text: string,
-          isSubmenu: boolean
-        }[],
-        找到 el-menu 容器中的所有菜单项，包括：
-        - 普通菜单项（el-menu-item）
-        - 可展开的子菜单（el-submenu）
-        返回菜单文本和是否为子菜单
-      `);
+      let allMenus = [];
+      let discoverAttempts = 0;
+      const maxAttempts = 3; // 最多尝试3次滚动发现
       
-      if (!Array.isArray(sidebarMenus) || sidebarMenus.length === 0) {
+      // 首先发现当前可见的菜单项
+      const initialMenus = await this.discoverVisibleMenuItems();
+      allMenus.push(...initialMenus);
+      
+      // 滚动发现更多菜单项
+      while (discoverAttempts < maxAttempts) {
+        const hasScrolled = await this.scrollSidebarToDiscoverMore();
+        
+        if (hasScrolled) {
+          // 发现滚动后新出现的菜单项
+          const newMenus = await this.discoverVisibleMenuItems();
+          
+          // 过滤重复的菜单项
+          const uniqueNewMenus = newMenus.filter(newMenu => 
+            !allMenus.some(existingMenu => existingMenu.text === newMenu.text)
+          );
+          
+          if (uniqueNewMenus.length > 0) {
+            allMenus.push(...uniqueNewMenus);
+            logger.debug(`滚动后发现 ${uniqueNewMenus.length} 个新菜单项`);
+          } else {
+            // 没有发现新菜单，可能已经到底部
+            break;
+          }
+        } else {
+          // 无法继续滚动
+          break;
+        }
+        
+        discoverAttempts++;
+      }
+      
+      if (allMenus.length === 0) {
         logger.debug('未发现菜单项');
         return [];
       }
       
-      const filteredMenus = sidebarMenus
+      const filteredMenus = allMenus
         .filter(menu => menu.text && menu.text.trim() !== '')
         .map((menu, index) => ({
           id: `sidebar-${Date.now()}-${index}`,
@@ -453,8 +556,7 @@ class MenuDiscovery {
           area: 'sidebar'
         }));
       
-      logger.debug(`发现 ${filteredMenus.length} 个菜单项`);
-      
+      logger.debug(`总共发现 ${filteredMenus.length} 个菜单项`);
       return this.filterMenus(filteredMenus);
       
     } catch (error) {
@@ -464,7 +566,7 @@ class MenuDiscovery {
   }
 
   /**
-   * 展开特定子菜单
+   * 展开特定子菜单（支持滚动定位）
    * @param {string} menuText - 子菜单文本
    * @returns {boolean} 是否成功展开
    */
@@ -472,11 +574,16 @@ class MenuDiscovery {
     try {
       logger.debug(`展开子菜单: ${menuText}`);
       
-      // 使用 Midscene AI 点击展开子菜单
+      // 1. 先确保菜单项在可视区域内
+      await this.ensureMenuVisible(menuText);
+      
+      // 2. 使用 Midscene AI 点击展开子菜单
       await this.agent.aiTap(`点击 el-menu 中的 "${menuText}" 子菜单以展开`);
       
-      // 等待展开动画完成
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 3. 等待展开动画完成，使用 Midscene 的 waitFor
+      await this.agent.aiWaitFor(`"${menuText}" 子菜单已完全展开，显示其子菜单项`, { 
+        timeout: 3000 
+      });
       
       logger.debug(`子菜单"${menuText}"展开完成`);
       return true;
@@ -488,7 +595,7 @@ class MenuDiscovery {
   }
 
   /**
-   * 发现展开后的子菜单项
+   * 发现展开后的子菜单项（支持滚动）
    * @param {string} parentMenuText - 父菜单文本
    * @returns {Array} 子菜单项列表
    */
@@ -496,12 +603,19 @@ class MenuDiscovery {
     try {
       logger.debug(`发现展开后的子菜单项: ${parentMenuText}`);
       
+      // 等待展开动画完全完成
+      await this.agent.aiWaitFor(`"${parentMenuText}" 的子菜单项完全加载显示`, { 
+        timeout: 2000 
+      });
+      
       // 使用 Midscene AI 查询展开后的子菜单项
       const subMenuItems = await this.agent.aiQuery(`
         {
-          text: string
+          text: string,
+          isSubmenu: boolean
         }[],
-        在 "${parentMenuText}" 子菜单展开后，找到其下的所有子菜单项
+        在 "${parentMenuText}" 子菜单展开后，找到其下的所有可见子菜单项，
+        包括可能需要滚动才能看到的项目
       `);
       
       if (!Array.isArray(subMenuItems) || subMenuItems.length === 0) {
@@ -516,6 +630,7 @@ class MenuDiscovery {
           text: item.text.trim(),
           parentText: parentMenuText,
           level: 2,
+          isSubmenu: item.isSubmenu || false,
           area: 'sidebar-sub'
         }));
       
@@ -530,14 +645,14 @@ class MenuDiscovery {
   }
 
   /**
-   * 检查子菜单是否已展开
+   * 检查子菜单是否已展开（使用 Midscene API）
    * @param {string} menuText - 菜单文本
    * @returns {boolean} 是否已展开
    */
   async isSubMenuExpanded(menuText) {
     try {
       const isExpanded = await this.agent.aiBoolean(`
-        el-menu 中的 "${menuText}" 子菜单是否已经展开
+        el-menu 中的 "${menuText}" 子菜单是否已经展开并显示子菜单项
       `);
       
       return isExpanded;
