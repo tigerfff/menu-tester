@@ -171,7 +171,7 @@ class MenuTester {
           // 5. 递归测试每个子菜单
           for (let i = 0; i < subMenus.length; i++) {
             const subMenu = subMenus[i];
-            
+            // 测试子菜单
             await this.testMenuBranchRecursively(subMenu, level + 1);
             
             // 在测试子菜单之间返回当前菜单页面（除非是最后一个）

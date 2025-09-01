@@ -417,35 +417,68 @@ class MenuDiscovery {
     try {
       logger.debug('发现当前页面的子菜单...');
       
-      // 检查是否有左侧菜单
-      const hasSidebar = await this.agent.aiBoolean(`
-        当前页面是否有左侧菜单栏或侧边导航菜单
-      `);
+      // 使用精确的 DOM 检查，避免误判顶部菜单
+      const hasSidebar = await this.page.evaluate(() => {
+        // 检查是否存在 el-menu 类的左侧菜单容器
+        const sidebarMenu = document.querySelector('.el-menu.el-menu-vertical, .el-menu-vertical, .el-menu');
+        if (!sidebarMenu) {
+          return false;
+        }
+        
+        // 确保不是顶部菜单（检查位置和样式）
+        const rect = sidebarMenu.getBoundingClientRect();
+        const isLeftSidebar = rect.left < window.innerWidth / 2; // 在左半边
+        const isVertical = rect.height > rect.width; // 高度大于宽度（垂直布局）
+        
+        return isLeftSidebar && isVertical;
+      });
       
       if (!hasSidebar) {
-        logger.debug('当前页面无左侧菜单');
+        logger.debug('当前页面无左侧菜单（DOM检查确认）');
         return [];
       }
       
-      const sidebarQuery = `
-        {
-          text: string,
-          isVisible: boolean,
-          isClickable: boolean,
-          isExpanded: boolean
-        }[],
-        列出当前页面左侧菜单中所有可见且可点击的菜单项，
-        只返回第一层菜单项，不要展开子菜单
-      `;
+      // 直接从 DOM 获取左侧菜单项，避免 AI 误判
+      const sidebarMenus = await this.page.evaluate(() => {
+        const sidebarMenu = document.querySelector('.el-menu.el-menu-vertical, .el-menu-vertical, .el-menu');
+        if (!sidebarMenu) return [];
+        
+        const menuItems = sidebarMenu.querySelectorAll('.el-menu-item, .el-submenu__title, .menu-item');
+        const menus = [];
+        
+        menuItems.forEach((item, index) => {
+          const text = item.textContent?.trim();
+          if (text && text.length > 0) {
+            // 检查是否可见和可点击
+            const isVisible = item.offsetParent !== null && 
+                            item.style.display !== 'none' && 
+                            item.style.visibility !== 'hidden';
+            
+            const isClickable = !item.disabled && 
+                              !item.classList.contains('disabled') &&
+                              item.onclick !== null || 
+                              item.querySelector('a, button') !== null;
+            
+            menus.push({
+              text: text,
+              isVisible: isVisible,
+              isClickable: isClickable,
+              isExpanded: item.classList.contains('is-active') || 
+                         item.classList.contains('expanded'),
+              element: item.outerHTML.substring(0, 100) // 保存部分HTML用于调试
+            });
+          }
+        });
+        
+        return menus;
+      });
       
-      const menus = await this.agent.aiQuery(sidebarQuery);
-      
-      if (!Array.isArray(menus)) {
-        logger.debug('AI 查询返回非数组结果');
+      if (!Array.isArray(sidebarMenus) || sidebarMenus.length === 0) {
+        logger.debug('DOM检查未发现左侧菜单项');
         return [];
       }
       
-      const filteredMenus = menus
+      const filteredMenus = sidebarMenus
         .filter(menu => menu.isVisible && menu.isClickable && menu.text && menu.text.trim() !== '')
         .map((menu, index) => ({
           id: `sidebar-${Date.now()}-${index}`,
@@ -453,10 +486,11 @@ class MenuDiscovery {
           isVisible: menu.isVisible,
           isClickable: menu.isClickable,
           isExpanded: menu.isExpanded || false,
-          area: 'sidebar'
+          area: 'sidebar',
+          debug: menu.element // 用于调试
         }));
       
-      logger.debug(`发现 ${filteredMenus.length} 个左侧菜单项`);
+      logger.debug(`发现 ${filteredMenus.length} 个左侧菜单项（DOM检查）`);
       return this.filterMenus(filteredMenus);
       
     } catch (error) {
