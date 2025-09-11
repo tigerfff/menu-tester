@@ -7,6 +7,7 @@ const PageValidator = require('./core/PageValidator');
 const ExceptionHandler = require('./core/ExceptionHandler');
 const ProgressTracker = require('./core/ProgressTracker');
 const MenuNavigator = require('./core/MenuNavigator');
+const MenuCache = require('./core/MenuCache');
 const { logger } = require('./utils/logger');
 
 class MenuTester {
@@ -21,6 +22,7 @@ class MenuTester {
     this.exceptionHandler = null;
     this.progressTracker = null;
     this.menuNavigator = null;
+    this.menuCache = null;
     this.mainPageUrl = config.url; // 主页面URL，用于跨域返回
     
     // Set logger verbosity
@@ -36,6 +38,9 @@ class MenuTester {
       
       // Initialize progress tracker
       this.progressTracker = new ProgressTracker(this.config);
+      
+      // Initialize menu cache
+      this.menuCache = new MenuCache(this.config);
       
       // Clean up old sessions
       await this.progressTracker.cleanupOldSessions();
@@ -55,8 +60,8 @@ class MenuTester {
       // Navigate to target URL and inject token
       await this.setupPage();
       
-      // 新流程：智能菜单发现和测试
-      await this.executeSmartMenuTesting();
+      // 新流程：智能菜单发现和测试（带缓存）
+      await this.executeSmartMenuTestingWithCache();
       
     } catch (error) {
           logger.error(`Menu testing failed: ${error.message}`);
@@ -72,7 +77,76 @@ class MenuTester {
   }
 
   /**
-   * 执行智能菜单测试（边发现边测试模式）
+   * 执行智能菜单测试（带缓存优化）
+   */
+  async executeSmartMenuTestingWithCache() {
+    try {
+      await this.progressTracker.updateStep('smart_menu_testing_with_cache');
+      
+      let rootMenus = [];
+      const discoveryStartTime = Date.now();
+      
+      // 1. 尝试从缓存加载菜单
+      if (this.config.useCache !== false) { // 默认启用缓存
+        logger.info('尝试从缓存加载菜单结构...');
+        const cachedData = await this.menuCache.loadCachedMenus();
+        
+        if (cachedData && cachedData.topLevelMenus) {
+          rootMenus = cachedData.topLevelMenus;
+          logger.success(`从缓存加载了 ${rootMenus.length} 个顶级菜单，跳过发现阶段`);
+          
+          // 显示缓存统计信息
+          const stats = this.menuCache.getStats();
+          logger.info(`缓存统计: 顶级菜单 ${stats.topLevelCount} 个，子菜单组 ${stats.subMenusCount} 个`);
+        }
+      }
+      
+      // 2. 如果缓存未命中，进行菜单发现
+      if (rootMenus.length === 0) {
+        logger.info('缓存未命中或被禁用，开始发现菜单...');
+        rootMenus = await this.discoverTopLevelMenus();
+        
+        const discoveryDuration = Date.now() - discoveryStartTime;
+        
+        if (rootMenus.length === 0) {
+          throw new Error('未发现任何菜单项');
+        }
+        
+        // 3. 保存新发现的菜单到缓存
+        if (this.config.useCache !== false) {
+          logger.info('保存菜单结构到缓存...');
+          await this.menuCache.saveMenusToCache(rootMenus, new Map(), discoveryDuration);
+        }
+      }
+      
+      // 4. 初始化进度跟踪
+      await this.progressTracker.initialize(rootMenus);
+      
+      // 5. 对每个根菜单进行深度优先测试（带缓存支持）
+      for (let i = 0; i < rootMenus.length; i++) {
+        const rootMenu = rootMenus[i];
+        logger.info(`开始测试第 ${i + 1}/${rootMenus.length} 个根菜单: ${rootMenu.text}`);
+        
+        await this.testMenuBranchRecursivelyWithCache(rootMenu, 1);
+        
+        // 完成一个根菜单分支后，返回首页准备下一个分支
+        if (i < rootMenus.length - 1) {
+          await this.menuNavigator.navigateToHome();
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      // 6. 生成最终报告
+      const summary = this.generateFinalSummary();
+      await this.progressTracker.complete(summary);
+      
+    } catch (error) {
+      throw new Error(`智能菜单测试失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 执行智能菜单测试（边发现边测试模式）- 原版本保留
    */
   async executeSmartMenuTesting() {
     try {
@@ -142,7 +216,93 @@ class MenuTester {
   }
 
   /**
-   * 递归测试菜单分支（边发现边测试的核心方法）
+   * 递归测试菜单分支（带缓存支持）
+   * @param {object} menu - 当前菜单
+   * @param {number} level - 菜单层级
+   */
+  async testMenuBranchRecursivelyWithCache(menu, level) {
+    try {
+      logger.progress(`测试 L${level} 菜单: ${menu.text} (路径: ${menu.path?.join(' → ') || menu.text})`);
+      
+      // 1. 测试当前菜单
+      const testResult = await this.testSingleMenuWithContext(menu, level);
+      
+      // 2. 如果测试成功且不是跨域，且未达到最大深度，尝试发现并测试子菜单
+      if (testResult.success && 
+          !testResult.isCrossDomain && 
+          level < this.config.depth &&
+          !await this.isBackToMainPage(menu)) {
+        
+        // 3. 尝试从缓存获取子菜单
+        const menuKey = this.menuCache.generateMenuKey(menu);
+        let subMenus = [];
+        
+        if (this.config.useCache !== false) {
+          subMenus = this.menuCache.getCachedSubMenus(menuKey);
+          if (subMenus.length > 0) {
+            logger.debug(`从缓存加载了 "${menu.text}" 的 ${subMenus.length} 个子菜单`);
+          }
+        }
+        
+        // 4. 如果缓存中没有子菜单，则进行发现
+        if (subMenus.length === 0) {
+          subMenus = await this.discoverCurrentSubMenus(menu, level);
+          
+          // 将新发现的子菜单添加到缓存
+          if (subMenus.length > 0 && this.config.useCache !== false) {
+            await this.menuCache.addSubMenusToCache(menuKey, subMenus);
+            logger.debug(`缓存了 "${menu.text}" 的 ${subMenus.length} 个子菜单`);
+          }
+        }
+        
+        if (subMenus.length > 0) {
+          logger.info(`在 "${menu.text}" 下发现 ${subMenus.length} 个子菜单`);
+          
+          // 5. 动态添加子菜单到进度跟踪
+          await this.progressTracker.addDiscoveredMenus(subMenus);
+          
+          // 6. 递归测试每个子菜单
+          for (let i = 0; i < subMenus.length; i++) {
+            const subMenu = subMenus[i];
+            // 测试子菜单
+            await this.testMenuBranchRecursivelyWithCache(subMenu, level + 1);
+            
+            // 在测试子菜单之间返回当前菜单页面（除非是最后一个）
+            if (i < subMenus.length - 1) {
+              await this.navigateBackToParentMenu(menu);
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+        } else {
+          logger.debug(`菜单 "${menu.text}" 下无子菜单`);
+        }
+      }
+      
+      // 7. 如果不是根菜单且有父菜单，准备返回（由调用者处理）
+      if (level > 1 && menu.parent) {
+        logger.debug(`完成菜单 "${menu.text}" 测试，准备返回上级`);
+      } else if (level === 1) {
+        logger.debug(`完成根菜单 "${menu.text}" 的整个分支测试`);
+      }
+      
+    } catch (error) {
+      logger.error(`测试菜单分支 "${menu.text}" 失败: ${error.message}`);
+      
+      // 记录失败结果
+      const failResult = {
+        success: false,
+        error: error.message,
+        screenshot: null
+      };
+      
+      if (menu.id && this.progressTracker.progress.menus[menu.id]) {
+        await this.progressTracker.completeMenu(menu.id, failResult);
+      }
+    }
+  }
+
+  /**
+   * 递归测试菜单分支（边发现边测试的核心方法）- 原版本保留
    * @param {object} menu - 当前菜单
    * @param {number} level - 菜单层级
    */

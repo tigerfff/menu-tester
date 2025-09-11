@@ -105,7 +105,11 @@ function getDefaultConfig() {
     tokenMethod: 'cookie',
     tokenName: 'access_token',
     screenshots: false,
-    verbose: false
+    verbose: false,
+    // 新增缓存相关配置
+    useCache: true,                    // 是否使用菜单缓存
+    cacheMaxAge: 7 * 24 * 60 * 60 * 1000, // 缓存最大存活时间（默认7天）
+    forceFreshDiscovery: false         // 是否强制重新发现菜单（忽略缓存）
   };
 }
 

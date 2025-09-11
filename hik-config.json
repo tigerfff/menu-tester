@@ -11,5 +11,8 @@
   "skip": "logout,exit,注销,登出,退出",
   "include": "*",
   "screenshots": true,
-  "output": "./hik-test-results"
+  "output": "./hik-test-results",
+  "useCache": true,
+  "cacheMaxAge": 604800000,
+  "forceFreshDiscovery": false
 } 
