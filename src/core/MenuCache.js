@@ -26,6 +26,15 @@ class MenuCache {
         discoveryDuration: 0
       }
     };
+    
+    // 添加防护方法
+    this.ensureSubMenusIsMap = () => {
+      if (!(this.cache.menus.subMenus instanceof Map)) {
+        logger.warning('Converting subMenus to Map');
+        const oldSubMenus = this.cache.menus.subMenus || {};
+        this.cache.menus.subMenus = new Map(Object.entries(oldSubMenus));
+      }
+    };
   }
 
   /**
@@ -112,17 +121,40 @@ class MenuCache {
       }
 
       const cacheData = await fs.readJson(this.cacheFile);
-      this.cache = cacheData;
+      
+      // 重新构建缓存对象，确保 Map 类型正确
+      this.cache = {
+        ...cacheData,
+        menus: {
+          topLevel: cacheData.menus.topLevel || [],
+          subMenus: new Map() // 重新创建 Map
+        }
+      };
 
-      // 转换 subMenus Map (JSON中Map会被序列化为对象)
-      this.cache.menus.subMenus = new Map(Object.entries(cacheData.menus.subMenus || {}));
+      // 安全地转换 subMenus
+      if (cacheData.menus && cacheData.menus.subMenus) {
+        try {
+          // 如果 subMenus 是对象，转换为 Map
+          if (typeof cacheData.menus.subMenus === 'object' && !Array.isArray(cacheData.menus.subMenus)) {
+            const entries = Object.entries(cacheData.menus.subMenus);
+            this.cache.menus.subMenus = new Map(entries);
+          }
+          // 如果已经是数组形式（Map.entries() 的结果），直接创建 Map
+          else if (Array.isArray(cacheData.menus.subMenus)) {
+            this.cache.menus.subMenus = new Map(cacheData.menus.subMenus);
+          }
+        } catch (conversionError) {
+          logger.warning(`子菜单数据转换失败: ${conversionError.message}，使用空 Map`);
+          this.cache.menus.subMenus = new Map();
+        }
+      }
 
-      logger.success(`成功加载菜单缓存: ${cacheData.menus.topLevel.length} 个顶级菜单`);
+      logger.success(`成功加载菜单缓存: ${this.cache.menus.topLevel.length} 个顶级菜单`);
       logger.info(`缓存创建时间: ${new Date(cacheData.timestamp).toLocaleString()}`);
       logger.info(`总菜单数: ${cacheData.metadata.totalMenus}, 最大深度: ${cacheData.metadata.maxDepth}`);
 
       return {
-        topLevelMenus: cacheData.menus.topLevel,
+        topLevelMenus: this.cache.menus.topLevel,
         subMenus: this.cache.menus.subMenus,
         metadata: cacheData.metadata
       };
@@ -227,6 +259,12 @@ class MenuCache {
    */
   async addSubMenusToCache(parentKey, subMenus) {
     try {
+      // 确保 subMenus 是 Map 对象
+      if (!(this.cache.menus.subMenus instanceof Map)) {
+        logger.warning('subMenus 不是 Map 对象，重新初始化');
+        this.cache.menus.subMenus = new Map();
+      }
+      
       this.cache.menus.subMenus.set(parentKey, subMenus);
       
       // 实时更新缓存文件
@@ -245,7 +283,18 @@ class MenuCache {
    * @returns {Array} 子菜单列表
    */
   getCachedSubMenus(parentKey) {
-    return this.cache.menus.subMenus.get(parentKey) || [];
+    try {
+      // 确保 subMenus 是 Map 对象
+      if (!(this.cache.menus.subMenus instanceof Map)) {
+        logger.warning('subMenus 不是 Map 对象，返回空数组');
+        return [];
+      }
+      
+      return this.cache.menus.subMenus.get(parentKey) || [];
+    } catch (error) {
+      logger.debug(`获取缓存子菜单失败: ${error.message}`);
+      return [];
+    }
   }
 
   /**
@@ -264,11 +313,20 @@ class MenuCache {
   async updateCacheFile() {
     try {
       if (await fs.pathExists(this.cacheFile)) {
+        // 确保 subMenus 是 Map 对象再序列化
+        let subMenusForSave = {};
+        
+        if (this.cache.menus.subMenus instanceof Map) {
+          subMenusForSave = Object.fromEntries(this.cache.menus.subMenus);
+        } else if (typeof this.cache.menus.subMenus === 'object') {
+          subMenusForSave = this.cache.menus.subMenus;
+        }
+        
         const cacheForSave = {
           ...this.cache,
           menus: {
             ...this.cache.menus,
-            subMenus: Object.fromEntries(this.cache.menus.subMenus)
+            subMenus: subMenusForSave
           },
           metadata: {
             ...this.cache.metadata,
@@ -356,9 +414,21 @@ class MenuCache {
    * @returns {object} 统计信息
    */
   getStats() {
+    let subMenusCount = 0;
+    
+    try {
+      if (this.cache.menus.subMenus instanceof Map) {
+        subMenusCount = this.cache.menus.subMenus.size;
+      } else if (typeof this.cache.menus.subMenus === 'object') {
+        subMenusCount = Object.keys(this.cache.menus.subMenus).length;
+      }
+    } catch (error) {
+      logger.debug(`获取统计信息失败: ${error.message}`);
+    }
+    
     return {
       topLevelCount: this.cache.menus.topLevel.length,
-      subMenusCount: this.cache.menus.subMenus.size,
+      subMenusCount,
       totalMenus: this.cache.metadata.totalMenus,
       maxDepth: this.cache.metadata.maxDepth,
       lastUpdated: this.cache.metadata.lastUpdated
