@@ -9,6 +9,7 @@ const MenuTester = require('../src/MenuTester');
 const { loadConfig, validateConfig } = require('../src/utils/config');
 const { logger } = require('../src/utils/logger');
 const CacheManager = require('../src/utils/cacheManager');
+const RouteManager = require('../src/utils/routeManager');
 
 const program = new Command();
 
@@ -22,9 +23,12 @@ program
   .command('test')
   .description('运行菜单测试')
   .option('-C, --config <path>', '配置文件路径', 'hik-config.json')
+  .option('-m, --mode <mode>', '测试模式 (ai|route|hybrid)', 'hybrid')
   .option('--no-cache', '禁用菜单缓存')
   .option('--fresh', '强制重新发现菜单（忽略缓存）')
   .option('--cache-max-age <days>', '缓存最大存活天数', '7')
+  .option('--no-verify-new', '混合模式下不验证新菜单')
+  .option('--no-auto-test', '不自动测试新发现的菜单')
   .option('--resume <sessionId>', '恢复中断的测试会话')
   .option('--verbose', '开启详细日志')
   .action(async (options) => {  
@@ -35,7 +39,10 @@ program
         config = await loadConfig(options.config);
       }
       
-      // 应用命令行缓存选项
+      // 应用命令行选项
+      if (options.mode) {
+        config.testMode = options.mode;
+      }
       if (options.noCache) {
         config.useCache = false;
       }
@@ -45,8 +52,22 @@ program
       if (options.cacheMaxAge) {
         config.cacheMaxAge = parseInt(options.cacheMaxAge) * 24 * 60 * 60 * 1000;
       }
+      if (options.noVerifyNew) {
+        config.hybridVerifyNew = false;
+      }
+      if (options.noAutoTest) {
+        config.autoTestNewMenus = false;
+      }
       if (options.verbose) {
         config.verbose = true;
+      }
+
+      // 验证测试模式
+      const validModes = ['ai', 'route', 'hybrid'];
+      if (config.testMode && !validModes.includes(config.testMode)) {
+        logger.error(`无效的测试模式: ${config.testMode}`);
+        logger.info(`支持的模式: ${validModes.join(', ')}`);
+        process.exit(1);
       }
 
       // 校验配置
@@ -56,6 +77,9 @@ program
         validation.errors.forEach(error => logger.error(`  - ${error}`));
         process.exit(1);
       }
+
+      // 显示使用的模式
+      logger.info(`🚀 启动菜单测试 - 模式: ${config.testMode || 'hybrid'}`);
 
       // 初始化并运行菜单测试
       const tester = new MenuTester(config);
@@ -105,6 +129,49 @@ program
       }
     } catch (error) {
       logger.error(`缓存管理失败: ${error.message}`);
+      process.exit(1);
+    }
+  });
+
+// 路由管理命令
+program
+  .command('routes')
+  .description('管理路由配置')
+  .option('-l, --list', '显示路由列表')
+  .option('-e, --export <file>', '导出路由到文件')
+  .option('-i, --import <file>', '从文件导入路由')
+  .option('-v, --validate', '验证路由有效性')
+  .option('-c, --clear', '清除路由缓存')
+  .option('-s, --stats', '显示路由统计')
+  .option('-t, --template <file>', '生成路由模板文件')
+  .option('--format <format>', '导出格式 (json|csv)', 'json')
+  .option('--mode <mode>', '导入模式 (merge|replace)', 'merge')
+  .option('-C, --config <path>', '配置文件路径', 'hik-config.json')
+  .action(async (options) => {
+    try {
+      const config = await loadConfig(options.config);
+      const routeManager = new RouteManager(config);
+
+      if (options.list) {
+        await routeManager.showRoutes();
+      } else if (options.export) {
+        await routeManager.exportRoutes(options.export, options.format);
+      } else if (options.import) {
+        await routeManager.importRoutes(options.import, options.mode);
+      } else if (options.validate) {
+        await routeManager.validateRoutes();
+      } else if (options.clear) {
+        await routeManager.clearRoutes();
+      } else if (options.stats) {
+        await routeManager.showStats();
+      } else if (options.template) {
+        await routeManager.generateTemplate(options.template);
+      } else {
+        // 默认显示路由列表
+        await routeManager.showRoutes();
+      }
+    } catch (error) {
+      logger.error(`路由管理失败: ${error.message}`);
       process.exit(1);
     }
   });

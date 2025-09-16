@@ -1,6 +1,6 @@
 {
-  "url": "https://pb.hik-cloud.com/chain/index.html#/todo/patrol",
-  "token": "52d377bb-08cd-4bf5-bc23-b4b645e2fc8a",
+  "url": "https://www.hik-cloud.com/chain/index.html#/home",
+  "token": "c822ce39-fe9e-4657-94a4-d60b66f3b610",
   "tokenMethod": "cookie",
   "tokenName": "accessToken",
   "headless": false,
@@ -14,5 +14,10 @@
   "output": "./hik-test-results",
   "useCache": true,
   "cacheMaxAge": 604800000,
-  "forceFreshDiscovery": false
+  "forceFreshDiscovery": false,
+  "testMode": "hybrid",
+  "hybridVerifyNew": true,
+  "autoTestNewMenus": true,
+  "routeTimeout": 5000,
+  "validateRoutePages": true
 } 

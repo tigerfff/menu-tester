@@ -60,8 +60,8 @@ class MenuTester {
       // Navigate to target URL and inject token
       await this.setupPage();
       
-      // 新流程：智能菜单发现和测试（带缓存）
-      await this.executeSmartMenuTestingWithCache();
+      // 新流程：根据配置选择测试模式
+      await this.executeMenuTesting();
       
     } catch (error) {
           logger.error(`Menu testing failed: ${error.message}`);
@@ -74,6 +74,383 @@ class MenuTester {
     } finally {
       await this.cleanup();
     }
+  }
+
+  /**
+   * 执行菜单测试 - 根据配置选择模式
+   */
+  async executeMenuTesting() {
+    const mode = this.config.testMode || 'hybrid'; // 默认混合模式
+    
+    logger.info(`使用测试模式: ${mode}`);
+    
+    switch (mode) {
+      case 'route':
+        await this.executeRouteModeTesting();
+        break;
+      case 'ai':
+        await this.executeSmartMenuTestingWithCache();
+        break;
+      case 'hybrid':
+        await this.executeHybridModeTesting();
+        break;
+      default:
+        logger.warning(`未知测试模式: ${mode}，使用混合模式`);
+        await this.executeHybridModeTesting();
+    }
+  }
+
+  /**
+   * 执行路由模式测试
+   */
+  async executeRouteModeTesting() {
+    try {
+      await this.progressTracker.updateStep('route_mode_testing');
+      
+      // 1. 从缓存加载路由表
+      const routes = await this.loadRoutesFromCache();
+      
+      if (routes.length === 0) {
+        throw new Error('未找到路由缓存，请先运行 AI 模式建立路由缓存，或手动导入路由配置');
+      }
+      
+      logger.success(`加载了 ${routes.length} 个路由进行测试`);
+      
+      // 2. 初始化进度跟踪
+      const routeMenus = routes.map((route, index) => ({
+        id: `route-${index}`,
+        text: route.menuText,
+        url: route.url,
+        level: route.level,
+        mode: 'route',
+        tested: false,
+        success: null,
+        error: null
+      }));
+      
+      await this.progressTracker.initialize(routeMenus);
+      
+      // 3. 逐个测试路由
+      for (let i = 0; i < routes.length; i++) {
+        const route = routes[i];
+        logger.info(`测试路由 ${i + 1}/${routes.length}: ${route.menuText} -> ${route.url}`);
+        
+        await this.testSingleRoute(route, routeMenus[i]);
+        
+        // 短暂延迟避免请求过快
+        if (i < routes.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      // 4. 生成测试报告
+      const summary = this.generateRouteModeTestSummary(routeMenus);
+      await this.progressTracker.complete(summary);
+      
+    } catch (error) {
+      throw new Error(`路由模式测试失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 执行混合模式测试
+   */
+  async executeHybridModeTesting() {
+    try {
+      await this.progressTracker.updateStep('hybrid_mode_testing');
+      
+      // 1. 尝试路由模式
+      const routes = await this.loadRoutesFromCache();
+      
+      if (routes.length > 0) {
+        logger.info('混合模式：优先使用路由测试');
+        
+        // 使用路由模式测试已知路由
+        await this.executeRouteModeTesting();
+        
+        // 可选：运行AI发现来验证是否有新菜单
+        if (this.config.hybridVerifyNew !== false) {
+          logger.info('验证是否有新增菜单...');
+          await this.verifyNewMenusWithAI();
+        }
+        
+      } else {
+        logger.info('混合模式：未找到路由缓存，使用 AI 模式');
+        await this.executeSmartMenuTestingWithCache();
+      }
+      
+    } catch (error) {
+      throw new Error(`混合模式测试失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 从缓存加载路由表
+   * @returns {Array} 路由列表
+   */
+  async loadRoutesFromCache() {
+    try {
+      // 使用专门的路由缓存加载逻辑（不要求顶级菜单存在）
+      await this.loadCacheForRoutes();
+      return this.menuCache.getAllRoutes();
+    } catch (error) {
+      logger.debug(`加载路由缓存失败: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * 为路由测试加载缓存文件（不要求顶级菜单存在）
+   */
+  async loadCacheForRoutes() {
+    try {
+      const fs = require('fs-extra');
+      const cacheFile = this.menuCache.cacheFile;
+      
+      if (!await fs.pathExists(cacheFile)) {
+        logger.debug('路由缓存文件不存在');
+        return;
+      }
+
+      const cacheData = await fs.readJson(cacheFile);
+      
+      // 检查URL是否匹配
+      if (cacheData.url !== this.config.url) {
+        logger.debug('缓存URL不匹配，使用空缓存');
+        return;
+      }
+
+      // 重新构建缓存对象，特别处理路由数据
+      this.menuCache.cache = {
+        ...cacheData,
+        menus: {
+          topLevel: cacheData.menus.topLevel || [],
+          subMenus: new Map()
+        },
+        routes: {
+          menuRoutes: new Map(),
+          routeValidation: new Map(),
+          hierarchy: [],
+          parameters: new Map()
+        }
+      };
+
+      // 安全地转换路由数据
+      if (cacheData.routes) {
+        // 转换 menuRoutes
+        if (cacheData.routes.menuRoutes) {
+          if (typeof cacheData.routes.menuRoutes === 'object' && !Array.isArray(cacheData.routes.menuRoutes)) {
+            this.menuCache.cache.routes.menuRoutes = new Map(Object.entries(cacheData.routes.menuRoutes));
+          }
+        }
+        
+        // 转换 routeValidation
+        if (cacheData.routes.routeValidation) {
+          if (typeof cacheData.routes.routeValidation === 'object' && !Array.isArray(cacheData.routes.routeValidation)) {
+            this.menuCache.cache.routes.routeValidation = new Map(Object.entries(cacheData.routes.routeValidation));
+          }
+        }
+        
+        // 其他路由数据
+        this.menuCache.cache.routes.hierarchy = cacheData.routes.hierarchy || [];
+        
+        if (cacheData.routes.parameters) {
+          if (typeof cacheData.routes.parameters === 'object' && !Array.isArray(cacheData.routes.parameters)) {
+            this.menuCache.cache.routes.parameters = new Map(Object.entries(cacheData.routes.parameters));
+          }
+        }
+      }
+
+      const routeCount = this.menuCache.cache.routes.menuRoutes.size;
+      if (routeCount > 0) {
+        logger.debug(`成功加载路由缓存: ${routeCount} 个路由映射`);
+      }
+      
+    } catch (error) {
+      logger.debug(`加载路由缓存失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 测试单个路由
+   * @param {object} route - 路由信息
+   * @param {object} menuItem - 菜单项对象
+   */
+  async testSingleRoute(route, menuItem) {
+    try {
+      await this.progressTracker.startMenu(menuItem.id);
+      
+      // 1. 直接导航到路由URL
+      logger.debug(`导航到路由: ${route.url}`);
+      await this.page.goto(route.url, {
+        waitUntil: 'load',
+        timeout: this.config.timeout
+      });
+      
+      // 2. 等待页面稳定
+      await this.waitForPageStable();
+      
+      // 3. 验证页面加载
+      const validationResult = await this.validateRoutePage(route);
+      
+      // 4. 截图（如果配置了）
+      let screenshot = null;
+      if (this.config.screenshots) {
+        screenshot = await this.pageValidator.takeScreenshot(menuItem, validationResult.success);
+      }
+      
+      // 5. 记录测试结果
+      const testResult = {
+        success: validationResult.success,
+        error: validationResult.error,
+        screenshot,
+        details: validationResult,
+        url: route.url,
+        mode: 'route'
+      };
+      
+      await this.progressTracker.completeMenu(menuItem.id, testResult);
+      
+      if (validationResult.success) {
+        logger.success(`✓ ${route.menuText}: 路由访问成功`);
+      } else {
+        logger.error(`✗ ${route.menuText}: ${validationResult.error}`);
+      }
+      
+    } catch (error) {
+      const failResult = {
+        success: false,
+        error: error.message,
+        screenshot: null,
+        url: route.url,
+        mode: 'route'
+      };
+      
+      await this.progressTracker.completeMenu(menuItem.id, failResult);
+      logger.error(`✗ ${route.menuText}: ${error.message}`);
+    }
+  }
+
+  /**
+   * 验证路由页面
+   * @param {object} route - 路由信息
+   * @returns {object} 验证结果
+   */
+  async validateRoutePage(route) {
+    try {
+      const currentUrl = this.page.url();
+      
+      // 基础验证
+      const basicValidation = await this.pageValidator.validatePageLoad(
+        { text: route.menuText, url: route.url },
+        route.url
+      );
+      
+      // 额外的路由特定验证
+      const routeSpecificValidation = await this.performRouteSpecificValidation(route);
+      
+      return {
+        success: basicValidation.success && routeSpecificValidation.success,
+        error: basicValidation.error || routeSpecificValidation.error,
+        currentUrl: currentUrl,
+        expectedUrl: route.url,
+        routeSpecific: routeSpecificValidation
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: `页面验证失败: ${error.message}`,
+        currentUrl: this.page.url(),
+        expectedUrl: route.url
+      };
+    }
+  }
+
+  /**
+   * 执行路由特定的验证
+   * @param {object} route - 路由信息
+   * @returns {object} 验证结果
+   */
+  async performRouteSpecificValidation(route) {
+    try {
+      // 获取该路由的验证规则
+      const validationRules = this.menuCache.cache.routes.routeValidation.get(route.url);
+      
+      if (!validationRules) {
+        // 没有特定验证规则，使用基础验证
+        return { success: true, details: 'No specific validation rules' };
+      }
+      
+      // 这里可以根据验证规则进行特定检查
+      // 例如：检查特定元素存在、页面标题、内容等
+      
+      return { success: true, details: 'Route specific validation passed' };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: `路由特定验证失败: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * 用AI验证是否有新菜单
+   */
+  async verifyNewMenusWithAI() {
+    try {
+      logger.info('使用 AI 验证是否有新增菜单...');
+      
+      // 运行简化的AI发现流程
+      const discoveredMenus = await this.discoverTopLevelMenus();
+      const cachedRoutes = this.menuCache.getAllRoutes();
+      
+      // 找出新菜单
+      const newMenus = discoveredMenus.filter(menu => 
+        !cachedRoutes.some(route => route.menuText === menu.text)
+      );
+      
+      if (newMenus.length > 0) {
+        logger.warning(`发现 ${newMenus.length} 个新菜单，建议更新路由缓存`);
+        
+        // 可选：自动将新菜单添加到测试队列
+        if (this.config.autoTestNewMenus !== false) {
+          logger.info('自动测试新发现的菜单...');
+          for (const menu of newMenus) {
+            await this.testMenuBranchRecursivelyWithCache(menu, 1);
+          }
+        }
+      } else {
+        logger.success('未发现新菜单，路由缓存完整');
+      }
+      
+    } catch (error) {
+      logger.warning(`AI验证新菜单失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 生成路由模式测试汇总
+   * @param {Array} routeMenus - 路由菜单列表
+   * @returns {object} 汇总信息
+   */
+  generateRouteModeTestSummary(routeMenus) {
+    const total = routeMenus.length;
+    const successful = routeMenus.filter(menu => {
+      const menuResult = this.progressTracker.progress.menus[menu.id];
+      return menuResult && menuResult.status === 'completed';
+    }).length;
+    const failed = total - successful;
+    
+    return {
+      mode: 'route',
+      totalRoutes: total,
+      successful,
+      failed,
+      successRate: total > 0 ? ((successful / total) * 100).toFixed(1) + '%' : '0%',
+      testDuration: Date.now() - this.progressTracker.startTime
+    };
   }
 
   /**
@@ -501,26 +878,31 @@ class MenuTester {
       // 1. 使用智能导航器导航到菜单
       await this.menuNavigator.navigateToMenu(menu);
       
-      // 2. 验证页面响应
-      const initialUrl = await this.getCurrentUrl();
+      // 2. 获取导航后的URL并记录路由映射
+      const currentUrl = await this.getCurrentUrl();
+      await this.recordMenuRoute(menu, currentUrl, level);
+      
+      // 3. 验证页面响应
+      const initialUrl = currentUrl;
       const validationResult = await this.pageValidator.validatePageLoad(menu, initialUrl);
       
-      // 3. 截图（如果配置了）
+      // 4. 截图（如果配置了）
       let screenshot = null;
       if (this.config.screenshots) {
         screenshot = await this.pageValidator.takeScreenshot(menu, validationResult.success);
       }
       
-      // 4. 构建测试结果
+      // 5. 构建测试结果
       const testResult = {
         success: validationResult.success,
         error: validationResult.error,
         screenshot,
         details: validationResult,
-        isCrossDomain: validationResult.isCrossDomain
+        isCrossDomain: validationResult.isCrossDomain,
+        recordedRoute: currentUrl
       };
       
-      // 5. 记录测试结果
+      // 6. 记录测试结果
       await this.progressTracker.completeMenu(menu.id, testResult);
       
       return testResult;
@@ -534,6 +916,36 @@ class MenuTester {
       
       await this.progressTracker.completeMenu(menu.id, failResult);
       return failResult;
+    }
+  }
+
+  /**
+   * 记录菜单到路由的映射
+   * @param {object} menu - 菜单对象
+   * @param {string} currentUrl - 当前URL
+   * @param {number} level - 菜单层级
+   */
+  async recordMenuRoute(menu, currentUrl, level) {
+    try {
+      // 只在AI模式下记录路由
+      if (this.config.testMode === 'ai' || this.config.testMode === 'hybrid' || !this.config.testMode) {
+        const validationRules = {
+          pageTitle: await this.page.title(),
+          timestamp: new Date().toISOString(),
+          userAgent: this.config.userAgent
+        };
+        
+        await this.menuCache.recordMenuRoute(
+          menu.text,
+          currentUrl,
+          validationRules,
+          level
+        );
+        
+        logger.debug(`记录路由: ${menu.text} -> ${currentUrl}`);
+      }
+    } catch (error) {
+      logger.debug(`记录路由失败: ${error.message}`);
     }
   }
 

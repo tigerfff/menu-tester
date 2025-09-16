@@ -1,0 +1,21 @@
+{
+  "exportedAt": "2025-09-16T08:02:47.920Z",
+  "totalRoutes": 2,
+  "sourceUrl": "https://pb.hik-cloud.com/chain/index.html#/todo/patrol",
+  "routes": [
+    {
+      "menuText": "工作台",
+      "url": "https://www.hik-cloud.com/chain/index.html#/home",
+      "originalUrl": "https://www.hik-cloud.com/chain/index.html#/home",
+      "level": 1,
+      "recordedAt": "2025-09-16T08:00:23.906Z"
+    },
+    {
+      "menuText": "示例菜单2",
+      "url": "https://www.hik-cloud.com/chain/index.html#/video/scene",
+      "originalUrl": "https://www.hik-cloud.com/chain/index.html#/video/scene",
+      "level": 2,
+      "recordedAt": "2025-09-16T08:00:23.906Z"
+    }
+  ]
+}

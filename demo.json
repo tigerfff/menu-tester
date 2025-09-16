@@ -1,0 +1,33 @@
+{
+  "exportedAt": "2025-09-16T07:21:39.202Z",
+  "description": "菜单路由配置模板",
+  "totalRoutes": 2,
+  "sourceUrl": "https://www.hik-cloud.com/chain/index.html#/",
+  "routes": [
+    {
+      "menuText": "工作台",
+      "url": "https://www.hik-cloud.com/chain/index.html#/home",
+      "level": 1,
+      "recordedAt": "2025-09-16T07:21:39.202Z",
+      "validation": {
+        "pageTitle": "页面1标题",
+        "expectedElements": [
+          "#main-content"
+        ]
+      }
+    },
+    {
+      "menuText": "示例菜单2",
+      "url": "https://www.hik-cloud.com/chain/index.html#/video/scene",
+      "level": 2,
+      "recordedAt": "2025-09-16T07:21:39.202Z",
+      "validation": {
+        "pageTitle": "页面2标题",
+        "expectedElements": [
+          "#sidebar",
+          ".content"
+        ]
+      }
+    }
+  ]
+}

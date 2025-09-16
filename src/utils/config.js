@@ -109,7 +109,13 @@ function getDefaultConfig() {
     // 新增缓存相关配置
     useCache: true,                    // 是否使用菜单缓存
     cacheMaxAge: 7 * 24 * 60 * 60 * 1000, // 缓存最大存活时间（默认7天）
-    forceFreshDiscovery: false         // 是否强制重新发现菜单（忽略缓存）
+    forceFreshDiscovery: false,        // 是否强制重新发现菜单（忽略缓存）
+    // 新增路由模式相关配置
+    testMode: 'hybrid',                // 测试模式: 'ai' | 'route' | 'hybrid'
+    hybridVerifyNew: true,             // 混合模式是否验证新菜单
+    autoTestNewMenus: true,            // 是否自动测试新发现的菜单
+    routeTimeout: 5000,                // 路由测试超时时间
+    validateRoutePages: true           // 是否验证路由页面内容
   };
 }
 

@@ -236,7 +236,7 @@ class ExceptionHandler {
    * 处理元素未找到错误
    * @param {Error} error - 元素错误
    * @param {object} context - 操作上下文
-   * @returns {object} 处理结果
+   * @returns {object} 处理结果 
    */
   async handleElementError(error, context) {
     logger.debug('Handling element error...');
