@@ -115,7 +115,116 @@ function getDefaultConfig() {
     hybridVerifyNew: true,             // 混合模式是否验证新菜单
     autoTestNewMenus: true,            // 是否自动测试新发现的菜单
     routeTimeout: 5000,                // 路由测试超时时间
-    validateRoutePages: true           // 是否验证路由页面内容
+    validateRoutePages: true,          // 是否验证路由页面内容
+    
+    // 页面断言配置
+    pageAssertions: {
+      enabled: true,                   // 是否启用页面断言
+      strictMode: true,                // 严格模式，更严格的空白页面检测
+      minContentLength: 100,           // 最小内容长度（字符数）
+      minVisibleElements: 3,           // 最小可见元素数量
+      timeoutMs: 5000,                 // 断言超时时间
+      
+      // 空白页面检测配置
+      blankPageDetection: {
+        enabled: true,
+        checkTitle: true,              // 检查页面标题
+        checkMainContent: true,        // 检查主内容区域
+        checkNavigation: true,         // 检查导航元素
+        checkForms: true,              // 检查表单元素
+        minTextLength: 50              // 主内容区域最小文本长度
+      },
+      
+      // 缺省状态检测配置
+      emptyStateDetection: {
+        enabled: true,
+        keywords: [                    // 缺省状态关键词
+          '暂无数据', '无数据', '没有数据', '数据为空',
+          '加载失败', '请求失败', '网络错误', '服务异常',
+          '暂无内容', '无内容', '内容为空', '页面不存在',
+          '404', '500', '403', '401', 'Not Found',
+          'No Data', 'No Content', 'Empty', 'Loading Error'
+        ],
+        selectors: [                   // 常见缺省状态的选择器
+          '.empty-state', '.no-data', '.empty-content',
+          '.error-page', '.not-found', '.loading-error',
+          '.el-empty', '.ant-empty', '.empty-placeholder'
+        ]
+      },
+      
+      // 自定义断言规则
+      customRules: [
+        // 示例：检查特定元素是否存在
+        // {
+        //   name: 'hasMainTable',
+        //   type: 'element_exists',
+        //   selector: 'table.main-table, .data-table',
+        //   required: true,
+        //   message: '页面缺少主要数据表格'
+        // },
+        // {
+        //   name: 'noErrorMessages',
+        //   type: 'element_not_exists',
+        //   selector: '.error-message, .alert-danger',
+        //   required: true,
+        //   message: '页面显示错误信息'
+        // }
+      ],
+
+      // 分层页面断言配置
+      domPreCheck: {
+        enabled: true,
+        failFast: true
+      },
+
+      // Midscene文本检测配置
+      midsceneTextCheck: {
+        enabled: true,
+        timeout: 5000,
+        checks: [
+          {
+            name: "notBlankScreen",
+            type: "aiBoolean",
+            prompt: "页面是否是白屏、空白页面或只显示加载状态？",
+            expectation: false,
+            failOnTrue: true,
+            failFast: false,
+            timeout: 5000,
+            failureMessage: "检测到白屏或空白页面"
+          },
+          {
+            name: "noPermissionError",
+            type: "aiBoolean",
+            prompt: "页面是否显示权限相关的错误信息？比如'没有权限'、'权限不足'、'访问被拒绝'、'暂无视频查看权限，请联系企业管理员开通'等",
+            expectation: false,
+            failOnTrue: true,
+            failFast: true,
+            timeout: 5000,
+            failureMessage: "检测到权限错误"
+          },
+          {
+            name: "noApiError",
+            type: "aiBoolean",
+            prompt: "页面是否显示接口错误或网络错误？比如'请求失败'、'加载失败'、'网络错误'、'服务异常'、'连接超时'等",
+            expectation: false,
+            failOnTrue: true,
+            failFast: false,
+            timeout: 5000,
+            failureMessage: "检测到接口或网络错误"
+          },
+          {
+            name: "hasValidBusinessContent",
+            type: "aiBoolean",
+            prompt: "页面是否包含有效的业务内容？（有实际的数据、表格、表单、视频等，不是错误页面、空状态页面或纯加载页面）",
+            expectation: true,
+            failOnFalse: true,
+            failFast: false,
+            timeout: 5000,
+            failureMessage: "页面缺少有效的业务内容"
+          }
+        ]
+      }
+    }
   };
 }
 

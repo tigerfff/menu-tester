@@ -1,6 +1,6 @@
 {
   "url": "https://www.hik-cloud.com/chain/index.html#/home",
-  "token": "c822ce39-fe9e-4657-94a4-d60b66f3b610",
+  "token": "fc4691db-ec50-4d3e-9c03-29561c694353",
   "tokenMethod": "cookie",
   "tokenName": "accessToken",
   "headless": false,
@@ -19,5 +19,61 @@
   "hybridVerifyNew": true,
   "autoTestNewMenus": true,
   "routeTimeout": 5000,
-  "validateRoutePages": true
-} 
+  "validateRoutePages": true,
+  
+  "pageAssertions": {
+    "enabled": true,
+    
+    "domPreCheck": {
+      "enabled": true,
+      "failFast": true
+    },
+    
+         "midsceneTextCheck": {
+       "enabled": true,
+       "timeout": 8000,
+       "checks": [
+         {
+           "name": "notBlankScreen",
+           "type": "aiBoolean",
+           "prompt": "页面是否是白屏、空白页面或只显示加载状态？",
+           "expectation": false,
+           "failOnTrue": true,
+           "failFast": false,
+           "timeout": 8000,
+           "failureMessage": "检测到白屏或空白页面"
+         },
+         {
+           "name": "noPermissionError",
+           "type": "aiBoolean",
+           "prompt": "页面是否显示权限相关的错误信息？比如'没有权限'、'权限不足'、'访问被拒绝'、'暂无视频查看权限，请联系企业管理员开通'等",
+           "expectation": false,
+           "failOnTrue": true,
+           "failFast": true,
+           "timeout": 8000,
+           "failureMessage": "检测到权限错误"
+         },
+         {
+           "name": "noApiError",
+           "type": "aiBoolean",
+           "prompt": "页面是否显示接口错误或网络错误？比如'请求失败'、'加载失败'、'网络错误'、'服务异常'、'连接超时'等",
+           "expectation": false,
+           "failOnTrue": true,
+           "failFast": false,
+           "timeout": 8000,
+           "failureMessage": "检测到接口或网络错误"
+         },
+         {
+           "name": "hasValidBusinessContent",
+           "type": "aiBoolean",
+           "prompt": "页面是否包含有效的业务内容？（有实际的数据、表格、表单、视频等，不是错误页面、空状态页面或纯加载页面）",
+           "expectation": true,
+           "failOnFalse": true,
+           "failFast": false,
+           "timeout": 8000,
+           "failureMessage": "页面缺少有效的业务内容"
+         }
+       ]
+    }
+  }
+}

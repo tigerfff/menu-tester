@@ -1,4 +1,6 @@
 const { logger } = require('../utils/logger');
+const EnhancedPageValidator = require('./EnhancedPageValidator');
+const LayeredPageValidator = require('./LayeredPageValidator');
 
 class PageValidator {
   constructor(agent, page, config) {
@@ -10,6 +12,11 @@ class PageValidator {
     this.mainDomainPatterns = config.domainPatterns || ['/chain/'];
     this.crossDomainTimeout = config.crossDomainTimeout || 8000;
     this.maxReturnAttempts = config.maxReturnAttempts || 2;
+    
+    // 初始化增强的页面验证器
+    this.enhancedValidator = new EnhancedPageValidator(agent, page, config);
+    // 初始化分层验证器
+    this.layeredValidator = new LayeredPageValidator(agent, page, config);
   }
 
   /**
@@ -247,9 +254,46 @@ class PageValidator {
     // 首先快速检查导航结果（最重要的）
     const navigationCheck = await this.checkNavigation(initialUrl);
     
-    // 如果已经检测到导航或内容变化，直接返回成功
+    // 如果已经检测到导航或内容变化，继续进行页面内容验证
     if (navigationCheck.navigated || navigationCheck.contentChanged) {
       logger.debug(`菜单 "${menu.text}" 导航成功 - URL变化: ${navigationCheck.navigated}, 内容变化: ${navigationCheck.contentChanged}`);
+      
+      // 如果启用了分层验证，执行完整的页面内容验证
+      if (this.config.pageAssertions?.enabled) {
+        logger.info('performQuickValidation - 执行分层验证...');
+        const layeredResult = await this.layeredValidator.validatePageWithLayers();
+        
+        if (!layeredResult.success) {
+          return {
+            success: false,
+            error: layeredResult.failureReason,
+            errorType: 'content_validation_failed',
+            pageUrl: navigationCheck.currentUrl,
+            urlChanged: navigationCheck.navigated,
+            contentChanged: navigationCheck.contentChanged,
+            hasErrors: true,
+            isCrossDomain: false,
+            details: layeredResult.layers,
+            warnings: layeredResult.summary.warnings
+          };
+        }
+        
+        // 分层验证通过
+        return {
+          success: true,
+          error: null,
+          errorType: null,
+          pageUrl: navigationCheck.currentUrl,
+          urlChanged: navigationCheck.navigated,
+          contentChanged: navigationCheck.contentChanged,
+          hasErrors: false,
+          isCrossDomain: false,
+          details: layeredResult.layers,
+          insights: layeredResult.summary.insights
+        };
+      }
+      
+      // 没有启用分层验证，返回原有的成功结果
       return {
         success: true,
         error: null,
@@ -286,7 +330,7 @@ class PageValidator {
    * @returns {Promise<object>} 1秒后的超时结果
    */
   async createTimeoutResult() {
-    await new Promise(resolve => setTimeout(resolve, 10000)); // 改为10秒
+    await new Promise(resolve => setTimeout(resolve, 300000)); // 改为30秒
     
     return {
       success: false,
@@ -303,7 +347,35 @@ class PageValidator {
    */
   async checkForErrorPage() {
     try {
-      // Check for common error indicators
+      // 添加调试日志
+      logger.debug(`PageValidator.checkForErrorPage - pageAssertions.enabled: ${this.config.pageAssertions?.enabled}`);
+      
+      // 如果启用了分层验证，使用新的验证逻辑
+      if (this.config.pageAssertions?.enabled) {
+        logger.info('PageValidator.checkForErrorPage - 使用分层验证进行错误页面检查...');
+        const layeredResult = await this.layeredValidator.validatePageWithLayers();
+        
+        if (!layeredResult.success) {
+          return {
+            success: false,
+            error: layeredResult.failureReason,
+            errorType: 'layered_validation_failed',
+            hasErrors: true,
+            details: layeredResult.layers,
+            warnings: layeredResult.summary.warnings
+          };
+        }
+        
+        // 分层验证通过，页面正常
+        return {
+          success: true,
+          details: layeredResult.layers,
+          insights: layeredResult.summary.insights
+        };
+      }
+      
+      // 降级到原有的简单AI检查
+      logger.debug('PageValidator.checkForErrorPage - 使用原有AI检查...');
       const hasError = await this.agent.aiBoolean(`
         页面是否显示错误信息，包括：
         - 404 页面未找到
@@ -352,12 +424,74 @@ class PageValidator {
   }
 
   /**
-   * 检查页面基础功能
-   * @returns {object} 基础功能检查结果
+   * 增强的页面验证（替换原有的checkBasicPageFunction）
    */
   async checkBasicPageFunction() {
     try {
-      // Check if page has basic interactive elements
+      // 添加调试日志
+      logger.debug(`PageValidator - pageAssertions.enabled: ${this.config.pageAssertions?.enabled}`);
+      logger.debug(`PageValidator - config.pageAssertions:`, JSON.stringify(this.config.pageAssertions, null, 2));
+      
+      // 如果启用了分层验证，使用新的验证逻辑
+      if (this.config.pageAssertions?.enabled) {
+        logger.debug('PageValidator - 开始执行分层验证...');
+        const layeredResult = await this.layeredValidator.validatePageWithLayers();
+        
+        if (!layeredResult.success) {
+          return {
+            success: false,
+            error: layeredResult.failureReason,
+            errorType: 'layered_validation_failed',
+            hasErrors: true,
+            details: layeredResult.layers,
+            warnings: layeredResult.summary.warnings
+          };
+        }
+
+        return {
+          success: true,
+          details: layeredResult.layers,
+          insights: layeredResult.summary.insights
+        };
+      }
+      
+      // 降级到原有的验证逻辑
+      return await this.performLegacyValidation();
+      
+    } catch (error) {
+      logger.debug(`分层验证失败，降级处理: ${error.message}`);
+      return await this.performLegacyValidation();
+    }
+  }
+
+  /**
+   * 原有的验证逻辑（作为降级方案）
+   */
+  async performLegacyValidation() {
+    try {
+      // 使用原有的增强验证器或AI检测
+      if (this.enhancedValidator) {
+        const enhancedResult = await this.enhancedValidator.performAssertions();
+        
+        if (!enhancedResult.success) {
+          return {
+            success: false,
+            error: enhancedResult.errors.join('; '),
+            errorType: 'enhanced_validation_failed',
+            hasErrors: true,
+            details: enhancedResult.details,
+            warnings: enhancedResult.warnings
+          };
+        }
+
+        return {
+          success: true,
+          details: enhancedResult.details,
+          warnings: enhancedResult.warnings
+        };
+      }
+
+      // 最后的降级：原有的AI检测
       const hasBasicFunction = await this.agent.aiBoolean(`
         页面是否正常显示内容，包括：
         - 页面有正常的文本内容
@@ -376,9 +510,9 @@ class PageValidator {
       }
 
       return { success: true };
-    } catch (error) {
-      logger.debug(`基础功能检测失败: ${error.message}`);
-      return { success: true }; // Assume success if check fails
+    } catch (fallbackError) {
+      logger.debug(`降级检测也失败: ${fallbackError.message}`);
+      return { success: true }; // 最终降级：假设成功
     }
   }
 
