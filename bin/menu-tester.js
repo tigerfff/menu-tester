@@ -10,6 +10,7 @@ const { loadConfig, validateConfig } = require('../src/utils/config');
 const { logger } = require('../src/utils/logger');
 const CacheManager = require('../src/utils/cacheManager');
 const RouteManager = require('../src/utils/routeManager');
+const StaticWebServer = require('../src/utils/webServer');
 
 const program = new Command();
 
@@ -253,6 +254,57 @@ process.on('unhandledRejection', (reason, promise) => {
   logger.error('未处理的 Promise 拒绝:', reason);
   process.exit(1);
 });
+
+// Web 配置界面命令
+program
+  .command('serve')
+  .description('启动 Web 配置界面')
+  .option('-p, --port <port>', '端口号', '3000')
+  .option('--no-open', '不自动打开浏览器')
+  .action(async (options) => {
+    try {
+      logger.info(chalk.blue('🚀 正在启动 Web 配置界面...'));
+      
+      const server = new StaticWebServer();
+      let port = parseInt(options.port);
+      
+      // 查找可用端口
+      if (port === 3000) {
+        port = await StaticWebServer.findAvailablePort(port);
+      }
+      
+      await server.start(port, options.open);
+      
+      // 保持进程运行
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+      process.stdin.on('data', process.exit.bind(process, 0));
+      
+    } catch (error) {
+      logger.error('启动 Web 服务器失败:', error.message);
+      process.exit(1);
+    }
+  });
+
+// 版本和帮助信息增强
+program
+  .command('info')
+  .description('显示工具信息和使用指南')
+  .action(() => {
+    console.log(chalk.green('🔍 Midscene Menu Tester'));
+    console.log(chalk.gray('AI-powered menu testing tool'));
+    console.log('');
+    console.log(chalk.blue('📚 使用方法:'));
+    console.log('  menu-tester test --config config.json  # 运行测试');
+    console.log('  menu-tester serve                      # 启动 Web 配置界面');
+    console.log('  menu-tester routes list                # 管理路由');
+    console.log('');
+    console.log(chalk.blue('🌐 Web 界面:'));
+    console.log('  运行 "menu-tester serve" 通过浏览器可视化配置');
+    console.log('');
+    console.log(chalk.blue('📖 文档:'));
+    console.log('  https://github.com/hik-cloud/midscene-menu-tester');
+  });
 
 // 优雅退出
 process.on('SIGINT', () => {

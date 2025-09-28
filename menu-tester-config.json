@@ -1,0 +1,56 @@
+{
+  "url": "https://pb.hik-cloud.com/chain/index.html#/home",
+  "token": "1e194d30-e967-4efd-a04e-298725bc2b0b",
+  "tokenMethod": "cookie",
+  "tokenName": "accessToken",
+  "mode": "route",
+  "timeout": 6000,
+  "headless": true,
+  "screenshots": false,
+  "skip": "logout,exit,注销",
+  "include": "*",
+  "pageAssertions": {
+    "enabled": true,
+    "domPreCheck": {
+      "enableNetworkCheck": true,
+      "networkCheckWindowMs": 8000,
+      "enableConsoleErrorCheck": true,
+      "consoleErrorCheckWindowMs": 5000
+    },
+    "midsceneTextCheck": {
+      "enabled": true,
+      "timeout": 8000,
+      "concurrency": 2,
+      "checks": {
+        "blankScreen": {
+          "enabled": true,
+          "name": "空白页面检查",
+          "type": "error",
+          "prompt": "页面是否显示为空白、没有任何有意义的内容，或者只显示加载中的状态？",
+          "description": "检测页面是否为空白或只有加载状态"
+        },
+        "permissionError": {
+          "enabled": true,
+          "name": "权限错误检查",
+          "type": "error",
+          "prompt": "页面是否显示\"无权限\"、\"权限不足\"、\"请联系管理员\"等权限相关的错误信息？",
+          "description": "检测权限拒绝相关的错误信息"
+        },
+        "apiError": {
+          "enabled": true,
+          "name": "API错误检查",
+          "type": "error",
+          "prompt": "页面是否显示\"网络错误\"、\"服务器错误\"、\"加载失败\"等API调用失败的错误信息？",
+          "description": "检测API调用失败的错误信息"
+        },
+        "validContent": {
+          "enabled": true,
+          "name": "有效内容检查",
+          "type": "success",
+          "prompt": "页面是否显示了正常的业务内容，比如数据列表、表单、图表等有意义的信息？",
+          "description": "检测页面是否有有效的业务内容"
+        }
+      }
+    }
+  }
+}

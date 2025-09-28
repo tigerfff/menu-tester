@@ -20,28 +20,28 @@ AI-powered menu testing CLI tool using Playwright and Midscene.js for automatic 
 
 ## Installation
 
-### Local Installation
+### NPM 安装 (推荐)
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd menu-tester
+# 全局安装
+npm install -g @hik-cloud/midscene-menu-tester
 
-# Install dependencies
-npm install
-
-# Install Playwright browsers
-npx playwright install
+# 安装完成后自动安装 Playwright 浏览器
+# 如需手动安装：npx playwright install chromium
 ```
 
-### Global Installation
+### 本地开发安装
 
 ```bash
-# Install globally
-npm install -g menu-tester
+# 克隆仓库
+git clone https://github.com/hik-cloud/midscene-menu-tester.git
+cd midscene-menu-tester
 
-# Or install from local directory
-npm install -g .
+# 安装依赖
+npm install
+
+# 安装 Playwright 浏览器
+npx playwright install
 ```
 
 ## Configuration
@@ -83,41 +83,64 @@ Create a configuration file (optional):
 
 ## Usage
 
-### Basic Usage
+### 🌐 Web 配置界面 (推荐)
+
+最简单的使用方式是通过 Web 界面：
 
 ```bash
-# Test a website with access token
-menu-tester --url "https://admin.example.com" --token "your-access-token"
+# 启动 Web 配置界面
+menu-tester serve
 
-# Use environment variable for token
-export ACCESS_TOKEN="your-token"
-menu-tester --url "https://admin.example.com"
+# 指定端口
+menu-tester serve --port 8080
+
+# 不自动打开浏览器
+menu-tester serve --no-open
 ```
 
-### Advanced Usage
+然后在浏览器中：
+1. 📋 **基础配置**: 设置网站 URL、令牌、测试模式等
+2. 🛣️ **路由管理**: 导入/导出路由表，手动添加路由
+3. ✅ **页面断言**: 配置 DOM 预检和 AI 文本检查
+4. 📥 **导出配置**: 下载生成的配置文件
+
+### 命令行使用
 
 ```bash
-# Use configuration file
-menu-tester --config config.json
+# 使用配置文件测试
+menu-tester test --config config.json
 
-# Test with custom settings
-menu-tester \
+# 路由模式测试
+menu-tester routes import routes.json
+menu-tester test --mode route
+
+# AI 模式测试
+menu-tester test \
   --url "https://admin.example.com" \
   --token "your-token" \
-  --depth 3 \
-  --timeout 8000 \
-  --screenshots \
-  --verbose
+  --mode ai
 
-# Resume interrupted session
-menu-tester --resume session-2024-01-15T10-30-00-000Z-abc123
+# 混合模式测试
+menu-tester test --mode hybrid --config config.json
+```
 
-# Test with specific menu patterns
-menu-tester \
-  --url "https://admin.example.com" \
-  --token "your-token" \
-  --include "user,system,settings" \
-  --skip "logout,exit"
+### 高级命令行使用
+
+```bash
+# 详细日志模式
+menu-tester test --config config.json --verbose
+
+# 恢复中断的会话
+menu-tester test --resume session-2024-01-15T10-30-00-000Z-abc123
+
+# 路由管理
+menu-tester routes list                 # 查看路由
+menu-tester routes export routes.json  # 导出路由
+menu-tester routes import routes.json  # 导入路由
+menu-tester routes clear               # 清空路由
+
+# 显示工具信息
+menu-tester info
 ```
 
 ### Token Injection Methods

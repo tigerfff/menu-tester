@@ -1,15 +1,18 @@
 {
-  "name": "menu-tester",
+  "name": "@hik-cloud/midscene-menu-tester",
   "version": "1.0.0",
   "description": "AI-powered menu testing CLI tool using Playwright and Midscene.js",
-  "main": "src/index.js",
+  "main": "src/MenuTester.js",
   "bin": {
     "menu-tester": "./bin/menu-tester.js"
   },
   "scripts": {
     "dev": "node bin/menu-tester.js",
+    "serve": "node bin/menu-tester.js serve",
     "build": "echo 'No build step needed'",
-    "test": "echo 'Tests not implemented yet'"
+    "test": "echo 'Tests not implemented yet'",
+    "postinstall": "npx playwright install chromium", 
+    "prepublishOnly": "npm run test"
   },
   "keywords": [
     "menu-testing",
@@ -17,10 +20,28 @@
     "playwright",
     "midscene",
     "cli",
-    "ai"
+    "ai",
+    "testing",
+    "spa",
+    "web-testing",
+    "route-testing"
   ],
-  "author": "",
+  "author": "HIK-Cloud Team",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hik-cloud/midscene-menu-tester.git"
+  },
+  "homepage": "https://github.com/hik-cloud/midscene-menu-tester#readme",
+  "bugs": {
+    "url": "https://github.com/hik-cloud/midscene-menu-tester/issues"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "config/",
+    "README.md"
+  ],
   "dependencies": {
     "@midscene/web": "^0.26.6",
     "playwright": "^1.48.0",
@@ -28,9 +49,12 @@
     "chalk": "^4.1.2",
     "ora": "^5.4.1",
     "fs-extra": "^11.2.0",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "open": "^8.4.2"
   },
   "engines": {
     "node": ">=18.0.0"
-  }
+  },
+  "preferGlobal": true
 } 

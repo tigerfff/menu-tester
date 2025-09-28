@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Midscene Menu Tester - 配置面板</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+</head>
+<body class="bg-gray-50">
+    <div id="app" class="container mx-auto p-6 max-w-6xl">
+        <!-- 页面标题 -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">🔍 Menu Tester</h1>
+            <p class="text-gray-600">AI-powered menu testing configuration panel</p>
+        </div>
+        
+        <!-- 配置选项卡 -->
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div class="border-b border-gray-200">
+                <nav class="flex space-x-8 px-6" aria-label="Tabs">
+                    <button @click="activeTab = 'basic'" 
+                            :class="{'border-b-2 border-blue-500 text-blue-600': activeTab === 'basic'}"
+                            class="py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                        📋 基础配置
+                    </button>
+                    <button @click="activeTab = 'routes'" 
+                            :class="{'border-b-2 border-blue-500 text-blue-600': activeTab === 'routes'}"
+                            class="py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                        🛣️ 路由管理
+                    </button>
+                    <button @click="activeTab = 'assertions'" 
+                            :class="{'border-b-2 border-blue-500 text-blue-600': activeTab === 'assertions'}"
+                            class="py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                        ✅ 页面断言
+                    </button>
+                    <button @click="activeTab = 'export'" 
+                            :class="{'border-b-2 border-blue-500 text-blue-600': activeTab === 'export'}"
+                            class="py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                        📥 导出配置
+                    </button>
+                </nav>
+            </div>
+            
+            <div class="p-6">
+                <!-- 基础配置 -->
+                <div v-show="activeTab === 'basic'" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">🌐 网站URL</label>
+                            <input v-model="config.url" type="url" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                   placeholder="https://admin.example.com">
+                            <p class="text-xs text-gray-500 mt-1">要测试的管理后台网站地址</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">🔑 访问令牌</label>
+                            <input v-model="config.token" type="password" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                   placeholder="your-access-token">
+                            <p class="text-xs text-gray-500 mt-1">用于身份验证的访问令牌</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">🔧 令牌注入方式</label>
+                            <select v-model="config.tokenMethod" 
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="cookie">Cookie (推荐)</option>
+                                <option value="localStorage">LocalStorage</option>
+                                <option value="header">HTTP Header</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">选择令牌的注入方式</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">🎯 测试模式</label>
+                            <select v-model="config.mode" 
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                <option value="ai">🤖 AI 模式 (智能发现菜单)</option>
+                                <option value="route">🛣️ 路由模式 (基于已知路由)</option>
+                                <option value="hybrid">🔄 混合模式 (AI + 路由)</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">选择菜单测试的方式</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">🔑 令牌字段名</label>
+                            <input v-model="config.tokenName" type="text" 
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                   placeholder="accessToken">
+                            <p class="text-xs text-gray-500 mt-1">Cookie/LocalStorage 中令牌的字段名</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">⏱️ 页面超时 (毫秒)</label>
+                            <input v-model.number="config.timeout" type="number" min="1000" max="30000" step="1000"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                   placeholder="6000">
+                            <p class="text-xs text-gray-500 mt-1">页面加载和验证的超时时间</p>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t pt-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">⚙️ 高级设置</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="flex items-center">
+                                    <input v-model="config.headless" type="checkbox" 
+                                           class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                                    <span class="ml-2 text-sm text-gray-700">无头模式运行</span>
+                                </label>
+                                <p class="text-xs text-gray-500 mt-1">不显示浏览器窗口，提高运行速度</p>
+                            </div>
+                            <div>
+                                <label class="flex items-center">
+                                    <input v-model="config.screenshots" type="checkbox" 
+                                           class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                                    <span class="ml-2 text-sm text-gray-700">截图保存</span>
+                                </label>
+                                <p class="text-xs text-gray-500 mt-1">保存测试过程中的页面截图</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">🚫 跳过菜单 (逗号分隔)</label>
+                                <input v-model="config.skip" type="text" 
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="logout,exit,注销">
+                                <p class="text-xs text-gray-500 mt-1">不测试的菜单关键词</p>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">🎯 包含菜单 (逗号分隔)</label>
+                                <input v-model="config.include" type="text" 
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                       placeholder="* (全部)">
+                                <p class="text-xs text-gray-500 mt-1">只测试匹配的菜单，* 表示全部</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 路由管理 -->
+                <div v-show="activeTab === 'routes'" class="space-y-6">
+                    <div class="flex flex-wrap gap-4 mb-6">
+                        <button @click="importRoutes" 
+                                class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors flex items-center">
+                            📥 导入路由
+                        </button>
+                        <button @click="exportRoutes" 
+                                class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors flex items-center">
+                            📤 导出路由
+                        </button>
+                        <button @click="addRoute" 
+                                class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition-colors flex items-center">
+                            ➕ 添加路由
+                        </button>
+                        <button @click="clearRoutes" 
+                                class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition-colors flex items-center">
+                            🗑️ 清空路由
+                        </button>
+                    </div>
+                    
+                    <!-- 添加路由表单 -->
+                    <div v-if="showAddRoute" class="bg-gray-50 p-4 rounded-lg border">
+                        <h4 class="font-medium text-gray-900 mb-3">添加新路由</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">菜单名称</label>
+                                <input v-model="newRoute.menuText" type="text" 
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                                       placeholder="首页">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">URL 地址</label>
+                                <input v-model="newRoute.url" type="url" 
+                                       class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                                       placeholder="https://admin.example.com/dashboard">
+                            </div>
+                        </div>
+                        <div class="flex gap-2 mt-4">
+                            <button @click="saveNewRoute" 
+                                    class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">
+                                保存
+                            </button>
+                            <button @click="cancelAddRoute" 
+                                    class="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600">
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 路由列表 -->
+                    <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
+                        <table class="min-w-full divide-y divide-gray-300">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">菜单名称</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr v-for="route in routes" :key="route.id" class="hover:bg-gray-50">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ route.menuText }}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{{ route.url }}</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                        <button @click="deleteRoute(route.id)" 
+                                                class="text-red-600 hover:text-red-900 transition-colors">🗑️ 删除</button>
+                                    </td>
+                                </tr>
+                                <tr v-if="routes.length === 0">
+                                    <td colspan="3" class="px-6 py-8 text-center text-gray-500">
+                                        暂无路由数据，请导入或手动添加路由
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 页面断言配置 -->
+                <div v-show="activeTab === 'assertions'" class="space-y-6">
+                    <div>
+                        <label class="flex items-center">
+                            <input v-model="config.pageAssertions.enabled" type="checkbox" 
+                                   class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                            <span class="ml-2 text-sm font-medium text-gray-700">✅ 启用页面断言检查</span>
+                        </label>
+                        <p class="text-xs text-gray-500 mt-1">开启后将进行多层页面验证，提高错误检测精度</p>
+                    </div>
+                    
+                    <div v-if="config.pageAssertions.enabled" class="space-y-6">
+                        <!-- DOM 预检配置 -->
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">🔍 DOM 预检配置</h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <label class="flex items-center">
+                                    <input v-model="config.pageAssertions.domPreCheck.enableNetworkCheck" type="checkbox" 
+                                           class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                    <span class="ml-2 text-sm text-gray-700">🌐 启用网络检查</span>
+                                </label>
+                                
+                                <label class="flex items-center">
+                                    <input v-model="config.pageAssertions.domPreCheck.enableConsoleErrorCheck" type="checkbox" 
+                                           class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                    <span class="ml-2 text-sm text-gray-700">🚨 启用控制台错误检查</span>
+                                </label>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">⏱️ 网络检查窗口 (毫秒)</label>
+                                    <input v-model.number="config.pageAssertions.domPreCheck.networkCheckWindowMs" type="number" 
+                                           class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">⏱️ 控制台检查窗口 (毫秒)</label>
+                                    <input v-model.number="config.pageAssertions.domPreCheck.consoleErrorCheckWindowMs" type="number" 
+                                           class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Midscene 文本检查配置 -->
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">🤖 AI 文本检查配置</h3>
+                            
+                            <div class="space-y-4">
+                                <label class="flex items-center">
+                                    <input v-model="config.pageAssertions.midsceneTextCheck.enabled" type="checkbox" 
+                                           class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                    <span class="ml-2 text-sm text-gray-700">启用 AI 语义检查</span>
+                                </label>
+                                
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">⏱️ 检查超时 (毫秒)</label>
+                                        <input v-model.number="config.pageAssertions.midsceneTextCheck.timeout" type="number" 
+                                               class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">🔄 并发检查数</label>
+                                        <input v-model.number="config.pageAssertions.midsceneTextCheck.concurrency" type="number" min="1" max="5"
+                                               class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">🎯 检查项目</label>
+                                    <div class="space-y-2">
+                                        <div v-for="(check, key) in config.pageAssertions.midsceneTextCheck.checks" :key="key"
+                                             class="border rounded-md p-3">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <label class="flex items-center">
+                                                    <input v-model="check.enabled" type="checkbox" 
+                                                           class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                                    <span class="ml-2 text-sm font-medium">{{ check.name }}</span>
+                                                </label>
+                                                <span class="text-xs text-gray-500">{{ check.type }}</span>
+                                            </div>
+                                            <textarea v-model="check.prompt" 
+                                                      class="w-full border border-gray-200 rounded text-xs p-2 h-16"
+                                                      :placeholder="check.description"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 导出配置 -->
+                <div v-show="activeTab === 'export'" class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">📄 生成的配置文件</h3>
+                        <textarea v-model="configJson" readonly 
+                                  class="w-full h-64 border border-gray-300 rounded-md px-3 py-2 font-mono text-sm bg-gray-50"
+                                  placeholder="配置将在这里显示..."></textarea>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-4">
+                        <button @click="downloadConfig" 
+                                class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors flex items-center">
+                            📥 下载配置文件
+                        </button>
+                        <button @click="copyConfig" 
+                                class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors flex items-center">
+                            📋 复制到剪贴板
+                        </button>
+                        <button @click="downloadRoutes" 
+                                class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors flex items-center">
+                            🛣️ 下载路由文件
+                        </button>
+                    </div>
+                    
+                    <div class="bg-blue-50 p-4 rounded-md border border-blue-200">
+                        <h4 class="font-medium text-blue-900 mb-3">📚 使用方法：</h4>
+                        <div class="text-sm text-blue-800 space-y-2">
+                            <div class="bg-blue-100 p-3 rounded font-mono text-xs">
+                                <p># 1. 安装工具</p>
+                                <p>npm install -g @hik-cloud/midscene-menu-tester</p>
+                                <br>
+                                <p># 2. 使用配置文件</p>
+                                <p>menu-tester --config config.json</p>
+                                <br>
+                                <p># 3. 或使用路由模式</p>
+                                <p>menu-tester routes import routes.json</p>
+                                <p>menu-tester test --mode route</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        
+        createApp({
+            data() {
+                return {
+                    activeTab: 'basic',
+                    showAddRoute: false,
+                    newRoute: {
+                        menuText: '',
+                        url: ''
+                    },
+                    config: {
+                        url: '',
+                        token: '',
+                        tokenMethod: 'cookie',
+                        tokenName: 'accessToken',
+                        mode: 'ai',
+                        timeout: 6000,
+                        headless: true,
+                        screenshots: false,
+                        skip: 'logout,exit,注销',
+                        include: '*',
+                        pageAssertions: {
+                            enabled: true,
+                            domPreCheck: {
+                                enableNetworkCheck: true,
+                                networkCheckWindowMs: 8000,
+                                enableConsoleErrorCheck: true,
+                                consoleErrorCheckWindowMs: 5000
+                            },
+                            midsceneTextCheck: {
+                                enabled: true,
+                                timeout: 8000,
+                                concurrency: 2,
+                                checks: {
+                                    blankScreen: {
+                                        enabled: true,
+                                        name: '空白页面检查',
+                                        type: 'error',
+                                        prompt: '页面是否显示为空白、没有任何有意义的内容，或者只显示加载中的状态？',
+                                        description: '检测页面是否为空白或只有加载状态'
+                                    },
+                                    permissionError: {
+                                        enabled: true,
+                                        name: '权限错误检查',
+                                        type: 'error',
+                                        prompt: '页面是否显示"无权限"、"权限不足"、"请联系管理员"等权限相关的错误信息？',
+                                        description: '检测权限拒绝相关的错误信息'
+                                    },
+                                    apiError: {
+                                        enabled: true,
+                                        name: 'API错误检查',
+                                        type: 'error',
+                                        prompt: '页面是否显示"网络错误"、"服务器错误"、"加载失败"等API调用失败的错误信息？',
+                                        description: '检测API调用失败的错误信息'
+                                    },
+                                    validContent: {
+                                        enabled: true,
+                                        name: '有效内容检查',
+                                        type: 'success',
+                                        prompt: '页面是否显示了正常的业务内容，比如数据列表、表单、图表等有意义的信息？',
+                                        description: '检测页面是否有有效的业务内容'
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    routes: []
+                }
+            },
+            computed: {
+                configJson() {
+                    return JSON.stringify(this.config, null, 2);
+                },
+                routesJson() {
+                    return JSON.stringify({ routes: this.routes }, null, 2);
+                }
+            },
+            methods: {
+                downloadConfig() {
+                    this.downloadJson(this.configJson, 'menu-tester-config.json');
+                },
+                downloadRoutes() {
+                    this.downloadJson(this.routesJson, 'routes.json');
+                },
+                downloadJson(content, filename) {
+                    const blob = new Blob([content], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                },
+                copyConfig() {
+                    navigator.clipboard.writeText(this.configJson).then(() => {
+                        alert('✅ 配置已复制到剪贴板！');
+                    }).catch(() => {
+                        alert('❌ 复制失败，请手动复制');
+                    });
+                },
+                importRoutes() {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.json';
+                    input.onchange = (e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                try {
+                                    const data = JSON.parse(e.target.result);
+                                    if (data.routes && Array.isArray(data.routes)) {
+                                        this.routes = data.routes;
+                                        alert('✅ 路由导入成功！');
+                                    } else {
+                                        alert('❌ 文件格式错误：缺少 routes 数组');
+                                    }
+                                } catch (error) {
+                                    alert('❌ 文件格式错误：' + error.message);
+                                }
+                            };
+                            reader.readAsText(file);
+                        }
+                    };
+                    input.click();
+                },
+                exportRoutes() {
+                    this.downloadRoutes();
+                },
+                addRoute() {
+                    this.showAddRoute = true;
+                    this.newRoute = { menuText: '', url: '' };
+                },
+                saveNewRoute() {
+                    if (this.newRoute.menuText && this.newRoute.url) {
+                        this.routes.push({
+                            id: Date.now().toString(),
+                            menuText: this.newRoute.menuText,
+                            url: this.newRoute.url
+                        });
+                        this.showAddRoute = false;
+                        this.newRoute = { menuText: '', url: '' };
+                    } else {
+                        alert('❌ 请填写完整的菜单名称和URL');
+                    }
+                },
+                cancelAddRoute() {
+                    this.showAddRoute = false;
+                    this.newRoute = { menuText: '', url: '' };
+                },
+                deleteRoute(id) {
+                    if (confirm('确定要删除这个路由吗？')) {
+                        this.routes = this.routes.filter(r => r.id !== id);
+                    }
+                },
+                clearRoutes() {
+                    if (confirm('确定要清空所有路由吗？')) {
+                        this.routes = [];
+                    }
+                }
+            },
+            mounted() {
+                // 尝试从本地存储加载配置
+                const savedConfig = localStorage.getItem('menu-tester-config');
+                if (savedConfig) {
+                    try {
+                        const parsed = JSON.parse(savedConfig);
+                        this.config = { ...this.config, ...parsed };
+                    } catch (e) {
+                        console.warn('Failed to load saved config:', e);
+                    }
+                }
+                
+                const savedRoutes = localStorage.getItem('menu-tester-routes');
+                if (savedRoutes) {
+                    try {
+                        this.routes = JSON.parse(savedRoutes);
+                    } catch (e) {
+                        console.warn('Failed to load saved routes:', e);
+                    }
+                }
+            },
+            watch: {
+                config: {
+                    handler(newConfig) {
+                        localStorage.setItem('menu-tester-config', JSON.stringify(newConfig));
+                    },
+                    deep: true
+                },
+                routes: {
+                    handler(newRoutes) {
+                        localStorage.setItem('menu-tester-routes', JSON.stringify(newRoutes));
+                    },
+                    deep: true
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

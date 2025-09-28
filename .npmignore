@@ -1,0 +1,44 @@
+# 测试结果和运行时文件
+menu-test-results/
+midscene_run/
+*.log
+
+# 环境配置文件
+.env
+.env.local
+.env.production
+.env.development
+hik-config.json
+
+# IDE 和编辑器文件
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Git 和版本控制
+.git/
+.gitignore
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 临时文件
+*.tmp
+*.temp
+
+# 开发工具
+.nyc_output/
+coverage/
+
+# 构建文件
+dist/
+build/
