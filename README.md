@@ -1,67 +1,49 @@
-# Menu Tester
+# 菜单测试工具（Menu Tester）
 
-AI-powered menu testing CLI tool using Playwright and Midscene.js for automatic navigation menu validation.
+基于 Playwright 与 Midscene.js 的智能菜单测试 CLI 工具，用于自动发现并验证管理后台的导航菜单。
 
-## Features
+## 功能特性
 
-- 🤖 **AI-Driven Menu Discovery**: Automatically identifies and tests navigation menus using natural language understanding
-- 🔐 **Token-Based Authentication**: Supports multiple token injection methods (Cookie, LocalStorage, Headers)
-- 📊 **Progress Tracking**: Real-time progress monitoring with session resume capability
-- 🛡️ **Exception Handling**: Robust error recovery and retry mechanisms
-- ⚡ **Fast Validation**: Quick page validation with 6-second timeout
-- 📸 **Screenshot Support**: Optional screenshot capture for test evidence
-- 🎯 **Configurable Filtering**: Include/exclude menu patterns
-- 📈 **Detailed Reporting**: Comprehensive test results and statistics
+- 🤖 **AI 菜单发现**：自动识别并测试页面菜单
+- 🔐 **令牌注入**：支持 Cookie / LocalStorage / Header 多种方式
+- 📊 **进度追踪**：支持断点续跑、统计与结果输出
+- 🛡️ **稳健容错**：异常处理、自动重试
+- ⚡ **快速校验**：默认 6s 页面超时
+- 📸 **截图可选**：用于调试与证据留存
 
-## Prerequisites
+## 环境要求
 
 - Node.js >= 18.0.0
-- AI Model Access (OpenAI, Anthropic, or other supported providers)
+- 可用的 AI 模型访问（OpenAI/Anthropic 或公司网关）
 
-## Installation
-
-### NPM 安装 (推荐)
+## 安装
 
 ```bash
-# 全局安装
+# 全局安装（推荐）
 npm install -g @hik-cloud/midscene-menu-tester
 
-# 安装完成后自动安装 Playwright 浏览器
-# 如需手动安装：npx playwright install chromium
+# 如需手动安装浏览器
+npx playwright install chromium
 ```
 
-### 本地开发安装
+## 配置
+
+### 环境变量（推荐其一）
 
 ```bash
-# 克隆仓库
-git clone https://github.com/hik-cloud/midscene-menu-tester.git
-cd midscene-menu-tester
+# 临时设置并运行（单次）
+OPENAI_API_KEY=sk-xxx menu-tester test --config config.json
 
-# 安装依赖
-npm install
+# 会话级设置
+export OPENAI_API_KEY=sk-xxx
 
-# 安装 Playwright 浏览器
-npx playwright install
+# 使用 .env（在运行目录创建）
+echo "OPENAI_API_KEY=sk-xxx" > .env
 ```
 
-## Configuration
+可选：`OPENAI_BASE_URL` 指向公司内网网关，客户端无需持有真实 Key。
 
-### Environment Variables
-
-Set up your AI model credentials:
-
-```bash
-# OpenAI
-export OPENAI_API_KEY="sk-your-openai-key"
-export OPENAI_BASE_URL="https://api.openai.com/v1"  # Optional
-
-# Or use .env file
-echo "OPENAI_API_KEY=sk-your-openai-key" > .env
-```
-
-### Configuration File
-
-Create a configuration file (optional):
+### 配置文件示例（可选）
 
 ```json
 {
@@ -81,229 +63,45 @@ Create a configuration file (optional):
 }
 ```
 
-## Usage
+## 使用方式
 
-### 🌐 Web 配置界面 (推荐)
-
-最简单的使用方式是通过 Web 界面：
+### Web 配置界面（推荐）
 
 ```bash
-# 启动 Web 配置界面
-menu-tester serve
-
-# 指定端口
-menu-tester serve --port 8080
-
-# 不自动打开浏览器
-menu-tester serve --no-open
+menu-tester serve              # 启动
+menu-tester serve --port 8080  # 指定端口
+menu-tester serve --no-open    # 不自动打开浏览器
 ```
 
-然后在浏览器中：
-1. 📋 **基础配置**: 设置网站 URL、令牌、测试模式等
-2. 🛣️ **路由管理**: 导入/导出路由表，手动添加路由
-3. ✅ **页面断言**: 配置 DOM 预检和 AI 文本检查
-4. 📥 **导出配置**: 下载生成的配置文件
+浏览器中可完成：基础配置、路由管理、页面断言、导出配置。
 
-### 命令行使用
+### 命令行
 
 ```bash
-# 使用配置文件测试
+# 使用配置文件
 menu-tester test --config config.json
 
-# 路由模式测试
+# 路由模式
 menu-tester routes import routes.json
 menu-tester test --mode route
 
-# AI 模式测试
-menu-tester test \
-  --url "https://admin.example.com" \
-  --token "your-token" \
-  --mode ai
+# AI 模式
+menu-tester test --mode ai --config config.json
 
-# 混合模式测试
+# 混合模式（默认推荐）
 menu-tester test --mode hybrid --config config.json
-```
 
-### 高级命令行使用
-
-```bash
-# 详细日志模式
+# 详细日志
 menu-tester test --config config.json --verbose
-
-# 恢复中断的会话
-menu-tester test --resume session-2024-01-15T10-30-00-000Z-abc123
-
-# 路由管理
-menu-tester routes list                 # 查看路由
-menu-tester routes export routes.json  # 导出路由
-menu-tester routes import routes.json  # 导入路由
-menu-tester routes clear               # 清空路由
-
-# 显示工具信息
-menu-tester info
 ```
 
-### Token Injection Methods
+## 常见问题（FAQ）
 
-```bash
-# Cookie injection (default)
-menu-tester --url "..." --token "..." --token-method cookie
+- **如何提供 AI 密钥？** 使用环境变量（临时、export、或 .env）。不建议把密钥写入代码或包内。
+- **截图有什么用？** 便于调试失败用例、生成报告证据，CI 排查更直观。
+- **token 与 OPENAI_API_KEY 有何区别？** 前者是被测系统的访问令牌；后者是调用大模型的凭证。
+- **组织内如何更安全？** 配置 `OPENAI_BASE_URL` 指向公司网关，客户端无需真实 Key。
 
-# LocalStorage injection
-menu-tester --url "..." --token "..." --token-method localStorage
+## 许可证
 
-# HTTP Header injection
-menu-tester --url "..." --token "..." --token-method header
-```
-
-## Command Line Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--url` | Target admin platform URL | Required |
-| `--token` | Access token for authentication | Required* |
-| `--config` | Configuration file path | - |
-| `--depth` | Menu testing depth (1-5) | 2 |
-| `--timeout` | Page timeout in milliseconds | 6000 |
-| `--headless` | Run in headless mode | true |
-| `--output` | Output directory for results | ./menu-test-results |
-| `--resume` | Resume interrupted test session | - |
-| `--retry` | Number of retries for failed operations | 2 |
-| `--skip` | Skip menu patterns (comma-separated) | logout,exit,注销 |
-| `--include` | Include only specified patterns | * |
-| `--token-method` | Token injection method | cookie |
-| `--token-name` | Token name for injection | access_token |
-| `--screenshots` | Take screenshots during testing | false |
-| `--verbose` | Enable verbose logging | false |
-
-*Required unless set via `ACCESS_TOKEN` environment variable
-
-## How It Works
-
-1. **Browser Initialization**: Launches Playwright browser with specified configuration
-2. **Token Injection**: Injects authentication token using selected method
-3. **Menu Discovery**: Uses AI to identify navigation menus on the page
-4. **Menu Testing**: Systematically clicks each menu and validates page response
-5. **Progress Tracking**: Saves progress for session resumption
-6. **Result Generation**: Produces detailed test reports and statistics
-
-## Output
-
-### Console Output
-
-```
-ℹ Starting new menu testing session...
-✓ Browser initialized successfully
-✓ Token injected successfully via cookie
-✓ Page setup completed
-✓ Discovered 12 menu items (8 top-level)
-
-Progress [████████████████████] 100%
-  Completed: 10, Failed: 1, Skipped: 1, Pending: 0
-
-==================================================
-MENU TESTING SUMMARY
-==================================================
-Total menus: 12
-✓ Completed: 10
-✗ Failed: 1
-⊝ Skipped: 1
-Success rate: 83%
-Duration: 2.3m
-Session ID: 2024-01-15T10-30-00-000Z-abc123
-==================================================
-```
-
-### Output Files
-
-- `session-{id}.json`: Session progress and results
-- `midscene_run/report/{id}.html`: Detailed Midscene report (if screenshots enabled)
-
-## Session Management
-
-### Resume Interrupted Tests
-
-```bash
-# List available sessions
-ls ./menu-test-results/session-*.json
-
-# Resume specific session
-menu-tester --resume session-2024-01-15T10-30-00-000Z-abc123
-```
-
-### Session Cleanup
-
-Old completed sessions are automatically cleaned up after 7 days.
-
-## Error Handling
-
-The tool includes comprehensive error handling:
-
-- **Page Exceptions**: Handles popups, loading errors, network issues
-- **Element Errors**: Scrolls to find elements, waits for page stability
-- **Navigation Errors**: Attempts page refresh or navigation back
-- **Authentication Errors**: Re-injects tokens when needed
-- **Timeout Handling**: Extends wait times for slow-loading pages
-
-## Supported Platforms
-
-This tool works with most web-based admin platforms including:
-
-- Ant Design Pro applications
-- Element UI admin panels
-- Bootstrap admin themes
-- Custom React/Vue/Angular admin interfaces
-- Traditional server-rendered admin pages
-
-## AI Model Support
-
-Compatible with various AI providers:
-
-- OpenAI (GPT-4, GPT-4-turbo, GPT-4o)
-- Anthropic (Claude)
-- Local models via API-compatible endpoints
-- Other Midscene.js supported providers
-
-## Troubleshooting
-
-### Common Issues
-
-1. **No menus found**
-   - Check if the page loads correctly
-   - Verify token authentication is working
-   - Try adjusting the timeout value
-
-2. **Token injection fails**
-   - Verify token format and validity
-   - Try different injection methods
-   - Check domain/cookie settings
-
-3. **AI queries timeout**
-   - Verify AI model API credentials
-   - Check network connectivity
-   - Try increasing timeout values
-
-### Debug Mode
-
-```bash
-# Enable verbose logging
-menu-tester --url "..." --token "..." --verbose
-
-# Run in headed mode to see browser
-menu-tester --url "..." --token "..." --headless false
-```
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Credits
-
-Built with:
-- [Playwright](https://playwright.dev/) - Browser automation
-- [Midscene.js](https://midscenejs.com/) - AI-powered UI automation
-- [Commander.js](https://github.com/tj/commander.js/) - CLI framework 
+MIT
