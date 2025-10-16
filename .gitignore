@@ -6,3 +6,7 @@ hik-test-results/
 .env
 config/hik-config.json
 *.log
+
+# Screenshot comparison
+screenshots/diff/
+*.png.tmp

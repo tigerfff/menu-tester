@@ -16,5 +16,13 @@
   "tokenInjection": {
     "method": "cookie",
     "name": "access_token"
+  },
+  "screenshotComparison": {
+    "enabled": false,
+    "threshold": 0.1,
+    "baselineDir": "./screenshots/baseline",
+    "diffDir": "./screenshots/diff",
+    "updateBaseline": false,
+    "failOnDiff": false
   }
 } 

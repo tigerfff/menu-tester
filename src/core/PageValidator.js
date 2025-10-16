@@ -1,6 +1,7 @@
 const { logger } = require('../utils/logger');
 const EnhancedPageValidator = require('./EnhancedPageValidator');
 const LayeredPageValidator = require('./LayeredPageValidator');
+const { ScreenshotComparator } = require('./ScreenshotComparator');
 
 class PageValidator {
   constructor(agent, page, config) {
@@ -17,6 +18,11 @@ class PageValidator {
     this.enhancedValidator = new EnhancedPageValidator(agent, page, config);
     // 初始化分层验证器
     this.layeredValidator = new LayeredPageValidator(agent, page, config);
+    // 初始化截图对比器
+    if (config.screenshotComparison?.enabled) {
+      this.screenshotComparator = new ScreenshotComparator(config);
+      logger.debug('截图对比功能已启用');
+    }
   }
 
   /**
@@ -654,10 +660,10 @@ class PageValidator {
   }
 
   /**
-   * Take screenshot for evidence
+   * Take screenshot for evidence (with optional comparison)
    * @param {object} menu - Menu item
    * @param {boolean} success - Whether validation was successful
-   * @returns {string} Screenshot path or null
+   * @returns {string|object} Screenshot path or comparison result
    */
   async takeScreenshot(menu, success) {
     if (!this.config.screenshots) {
@@ -665,12 +671,64 @@ class PageValidator {
     }
 
     try {
+      // 确保菜单对象包含URL信息
+      const menuWithUrl = {
+        ...menu,
+        url: menu.url || this.page.url()
+      };
+
+      // 如果启用了截图对比功能
+      if (this.screenshotComparator) {
+        // 获取截图 buffer
+        const screenshot = await this.page.screenshot({ fullPage: false });
+        
+        // 执行对比或保存基线
+        const comparisonResult = await this.screenshotComparator.compareOrSaveBaseline(
+          menuWithUrl, 
+          screenshot
+        );
+        
+        // 记录到 Midscene 日志
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const status = success ? 'success' : 'failed';
+        const filename = `menu-${comparisonResult.key}-${status}-${timestamp}`;
+        
+        await this.agent.logScreenshot(filename, {
+          content: `Menu: ${menuWithUrl.text}, Status: ${status}, Comparison: ${comparisonResult.type}`
+        });
+        
+        // 如果是对比模式且发现差异
+        if (comparisonResult.type === 'comparison') {
+          if (comparisonResult.match) {
+            logger.info(`✅ 截图对比通过: ${comparisonResult.key} (差异 ${comparisonResult.diffPercentage}%)`);
+          } else {
+            logger.warn(`⚠️  截图差异检测: ${comparisonResult.key} (差异 ${comparisonResult.diffPercentage}%)`);
+            if (comparisonResult.diffPath) {
+              logger.warn(`   差异图: ${comparisonResult.diffPath}`);
+            }
+            
+            // 如果配置了差异即失败
+            if (this.screenshotComparator.failOnDiff) {
+              throw new Error(`截图对比失败: 差异 ${comparisonResult.diffPercentage}%`);
+            }
+          }
+        } else if (comparisonResult.type === 'baseline') {
+          logger.info(`📸 ${comparisonResult.message}: ${comparisonResult.key}`);
+        }
+        
+        return {
+          filename,
+          comparison: comparisonResult
+        };
+      }
+      
+      // 原有的简单截图逻辑
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const status = success ? 'success' : 'failed';
-      const filename = `menu-${menu.id}-${status}-${timestamp}`;
+      const filename = `menu-${menuWithUrl.id || 'unknown'}-${status}-${timestamp}`;
       
       await this.agent.logScreenshot(filename, {
-        content: `Menu: ${menu.text}, Status: ${status}`
+        content: `Menu: ${menuWithUrl.text}, Status: ${status}`
       });
 
       return filename;

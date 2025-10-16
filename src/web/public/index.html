@@ -116,6 +116,68 @@
                                 </label>
                                 <p class="text-xs text-gray-500 mt-1">保存测试过程中的页面截图</p>
                             </div>
+                            <div class="md:col-span-2">
+                                <label class="flex items-center">
+                                    <input v-model="config.screenshotComparison.enabled" type="checkbox" 
+                                           class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200">
+                                    <span class="ml-2 text-sm text-gray-700">📊 截图对比</span>
+                                </label>
+                                <p class="text-xs text-gray-500 mt-1">像素级对比，检测UI变化（视觉回归测试）</p>
+                                
+                                <!-- 截图对比详细配置 -->
+                                <div v-if="config.screenshotComparison.enabled" class="mt-4 ml-6 space-y-4 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">🎯 差异阈值 (0-1)</label>
+                                            <input v-model.number="config.screenshotComparison.threshold" 
+                                                   type="number" step="0.01" min="0" max="1"
+                                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                                            <p class="text-xs text-gray-500 mt-1">越小越严格，默认 0.1</p>
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="flex items-center">
+                                                <input v-model="config.screenshotComparison.updateBaseline" type="checkbox" 
+                                                       class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                                <span class="ml-2 text-sm text-gray-700">🔄 更新基线截图</span>
+                                            </label>
+                                            <p class="text-xs text-gray-500 mt-1">首次运行或UI更新后开启</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">📁 基线目录</label>
+                                            <input v-model="config.screenshotComparison.baselineDir" type="text" 
+                                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                                                   placeholder="./screenshots/baseline">
+                                        </div>
+                                        
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">📂 差异图目录</label>
+                                            <input v-model="config.screenshotComparison.diffDir" type="text" 
+                                                   class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                                                   placeholder="./screenshots/diff">
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <label class="flex items-center">
+                                            <input v-model="config.screenshotComparison.failOnDiff" type="checkbox" 
+                                                   class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                            <span class="ml-2 text-sm text-gray-700">❌ 发现差异时立即失败</span>
+                                        </label>
+                                        <p class="text-xs text-gray-500 mt-1">适用于CI/CD严格验证</p>
+                                    </div>
+                                    
+                                    <div class="bg-blue-100 p-3 rounded text-xs text-gray-700">
+                                        <p class="font-medium mb-1">💡 使用提示：</p>
+                                        <p>1. 首次运行：启用"更新基线"，建立基线截图</p>
+                                        <p>2. 回归测试：关闭"更新基线"，对比差异</p>
+                                        <p>3. 菜单模式和路由模式使用相同的URL-based key，可互相对比</p>
+                                    </div>
+                                </div>
+                            </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">🚫 跳过菜单 (逗号分隔)</label>
                                 <input v-model="config.skip" type="text" 
@@ -378,6 +440,14 @@
                         timeout: 6000,
                         headless: true,
                         screenshots: false,
+                        screenshotComparison: {
+                            enabled: false,
+                            threshold: 0.1,
+                            baselineDir: './screenshots/baseline',
+                            diffDir: './screenshots/diff',
+                            updateBaseline: false,
+                            failOnDiff: false
+                        },
                         skip: 'logout,exit,注销',
                         include: '*',
                         pageAssertions: {

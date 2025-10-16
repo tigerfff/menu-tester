@@ -1,0 +1,112 @@
+{
+  "url": "https://pb.hik-cloud.com/chain/index.html#/home",
+  "token": "771762a6-5db6-4069-9c39-e4ea0a11f090",
+  "tokenMethod": "cookie",
+  "tokenName": "accessToken",
+  "mode": "route",
+  "timeout": 6000,
+  "headless": true,
+  "verbose": false,
+  "screenshots": true,
+  "skip": "logout,exit,注销",
+  "include": "*",
+  "screenshotComparison": {
+    "enabled": true,
+    "threshold": 0.2,
+    "baselineDir": "./screenshots/baseline",
+    "diffDir": "./screenshots/diff",
+    "updateBaseline": false,
+    "failOnDiff": false
+  },
+  "pageAssertions": {
+    "enabled": true,
+    "domPreCheck": {
+      "enableNetworkCheck": true, 
+      "networkCheckWindowMs": 8000,
+      "enableConsoleErrorCheck": true,
+      "consoleErrorCheckWindowMs": 5000,
+      "enabled": true,
+      "failFast": true
+    },
+    "midsceneTextCheck": {
+      "enabled": true,
+      "timeout": 8000,
+      "concurrency": 2,
+      "checks": [
+        {
+          "name": "非白屏检查",
+          "type": "aiBoolean",
+          "prompt": "页面是否是白屏、空白页面或只显示加载状态？",
+          "expectation": false,
+          "failOnTrue": true,
+          "failFast": false,
+          "timeout": 5000,
+          "failureMessage": "检测到白屏或空白页面"
+        },
+        {
+          "name": "无权限错误检查",
+          "type": "aiBoolean",
+          "prompt": "页面是否显示权限相关的错误信息？比如'没有权限'、'权限不足'、'访问被拒绝'等",
+          "expectation": false,
+          "failOnTrue": true,
+          "failFast": true,
+          "timeout": 5000,
+          "failureMessage": "检测到权限错误"
+        },
+        {
+          "name": "无接口错误检查",
+          "type": "aiBoolean",
+          "prompt": "页面是否显示接口错误或网络错误？比如'请求失败'、'加载失败'、'网络错误'、'服务异常'等",
+          "expectation": false,
+          "failOnTrue": true,
+          "failFast": false,
+          "timeout": 5000,
+          "failureMessage": "检测到接口或网络错误"
+        },
+        {
+          "name": "有效业务内容检查",
+          "type": "aiBoolean",
+          "prompt": "页面是否包含有效的业务内容？（有实际的数据、表格、表单、视频等，不是错误页面、空状态页面或纯加载页面）",
+          "expectation": true,
+          "failOnFalse": true,
+          "failFast": false,
+          "timeout": 5000,
+          "failureMessage": "页面缺少有效的业务内容"
+        },
+        {
+          "name": "自定义检查5",
+          "type": "aiBoolean",
+          "prompt": "",
+          "expectation": false,
+          "failOnTrue": false,
+          "failOnFalse": false,
+          "failFast": false,
+          "timeout": 5000,
+          "failureMessage": ""
+        }
+      ]
+    }
+  },
+  "routes": [
+    {
+      "menuText": "home",
+      "url": "https://pb.hik-cloud.com/chain/index.html#/home",
+      "level": 1
+    },
+    {
+      "menuText": "config-template",
+      "url": "https://pb.hik-cloud.com/chain/index.html#/inspect/config/template",
+      "level": 1
+    },
+    {
+      "menuText": "evaluate",
+      "url": "https://pb.hik-cloud.com/chain/index.html#/inspect/evaluate",
+      "level": 1
+    },
+    {
+      "menuText": "inspect-spotCheck",
+      "url": "https://pb.hik-cloud.com/chain/index.html#/inspect/spotCheck",
+      "level": 1
+    }
+  ]
+}
