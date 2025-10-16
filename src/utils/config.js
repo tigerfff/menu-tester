@@ -82,6 +82,18 @@ function validateConfig(config) {
     errors.push(`Token method must be one of: ${validTokenMethods.join(', ')}`);
   }
 
+  // Optional inline routes validation
+  if (config.routes !== undefined) {
+    if (!Array.isArray(config.routes)) {
+      errors.push('routes must be an array when provided');
+    } else {
+      const invalid = config.routes.find(r => !r || typeof r !== 'object' || !r.menuText || !r.url);
+      if (invalid) {
+        errors.push('each route item must include menuText and url');
+      }
+    }
+  }
+
   return {
     isValid: errors.length === 0,
     errors
@@ -116,6 +128,7 @@ function getDefaultConfig() {
     autoTestNewMenus: true,            // 是否自动测试新发现的菜单
     routeTimeout: 5000,                // 路由测试超时时间
     validateRoutePages: true,          // 是否验证路由页面内容
+    // routes: []                      // 可选：内联路由，提供后在路由模式下优先使用
     
     // 页面断言配置
     pageAssertions: {
@@ -171,19 +184,13 @@ function getDefaultConfig() {
         // }
       ],
 
-      // 分层页面断言配置
-      domPreCheck: {
-        enabled: true,
-        failFast: true
-      },
-
-      // Midscene文本检测配置
+      // Midscene AI 文本检测配置
       midsceneTextCheck: {
         enabled: true,
         timeout: 5000,
         checks: [
           {
-            name: "notBlankScreen",
+            name: "非白屏检查",
             type: "aiBoolean",
             prompt: "页面是否是白屏、空白页面或只显示加载状态？",
             expectation: false,
@@ -193,7 +200,7 @@ function getDefaultConfig() {
             failureMessage: "检测到白屏或空白页面"
           },
           {
-            name: "noPermissionError",
+            name: "无权限错误检查",
             type: "aiBoolean",
             prompt: "页面是否显示权限相关的错误信息？比如'没有权限'、'权限不足'、'访问被拒绝'、'暂无视频查看权限，请联系企业管理员开通'等",
             expectation: false,
@@ -203,7 +210,7 @@ function getDefaultConfig() {
             failureMessage: "检测到权限错误"
           },
           {
-            name: "noApiError",
+            name: "无接口错误检查",
             type: "aiBoolean",
             prompt: "页面是否显示接口错误或网络错误？比如'请求失败'、'加载失败'、'网络错误'、'服务异常'、'连接超时'等",
             expectation: false,
@@ -213,7 +220,7 @@ function getDefaultConfig() {
             failureMessage: "检测到接口或网络错误"
           },
           {
-            name: "hasValidBusinessContent",
+            name: "有效业务内容检查",
             type: "aiBoolean",
             prompt: "页面是否包含有效的业务内容？（有实际的数据、表格、表单、视频等，不是错误页面、空状态页面或纯加载页面）",
             expectation: true,

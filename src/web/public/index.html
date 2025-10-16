@@ -225,37 +225,6 @@
                     </div>
                     
                     <div v-if="config.pageAssertions.enabled" class="space-y-6">
-                        <!-- DOM 预检配置 -->
-                        <div class="bg-blue-50 p-4 rounded-lg">
-                            <h3 class="text-lg font-medium text-gray-900 mb-4">🔍 DOM 预检配置</h3>
-                            
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <label class="flex items-center">
-                                    <input v-model="config.pageAssertions.domPreCheck.enableNetworkCheck" type="checkbox" 
-                                           class="rounded border-gray-300 text-blue-600 shadow-sm">
-                                    <span class="ml-2 text-sm text-gray-700">🌐 启用网络检查</span>
-                                </label>
-                                
-                                <label class="flex items-center">
-                                    <input v-model="config.pageAssertions.domPreCheck.enableConsoleErrorCheck" type="checkbox" 
-                                           class="rounded border-gray-300 text-blue-600 shadow-sm">
-                                    <span class="ml-2 text-sm text-gray-700">🚨 启用控制台错误检查</span>
-                                </label>
-                                
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">⏱️ 网络检查窗口 (毫秒)</label>
-                                    <input v-model.number="config.pageAssertions.domPreCheck.networkCheckWindowMs" type="number" 
-                                           class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">⏱️ 控制台检查窗口 (毫秒)</label>
-                                    <input v-model.number="config.pageAssertions.domPreCheck.consoleErrorCheckWindowMs" type="number" 
-                                           class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
-                                </div>
-                            </div>
-                        </div>
-                        
                         <!-- Midscene 文本检查配置 -->
                         <div class="bg-green-50 p-4 rounded-lg">
                             <h3 class="text-lg font-medium text-gray-900 mb-4">🤖 AI 文本检查配置</h3>
@@ -282,21 +251,59 @@
                                 </div>
                                 
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">🎯 检查项目</label>
-                                    <div class="space-y-2">
-                                        <div v-for="(check, key) in config.pageAssertions.midsceneTextCheck.checks" :key="key"
-                                             class="border rounded-md p-3">
-                                            <div class="flex items-center justify-between mb-2">
-                                                <label class="flex items-center">
-                                                    <input v-model="check.enabled" type="checkbox" 
-                                                           class="rounded border-gray-300 text-blue-600 shadow-sm">
-                                                    <span class="ml-2 text-sm font-medium">{{ check.name }}</span>
-                                                </label>
-                                                <span class="text-xs text-gray-500">{{ check.type }}</span>
+                                    <div class="flex items-center justify-between mb-2">
+                                        <label class="block text-sm font-medium text-gray-700">🎯 检查项目</label>
+                                        <div class="flex gap-2">
+                                            <button @click="resetChecksToDefault" 
+                                                    class="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600 flex items-center">
+                                                🔄 恢复默认
+                                            </button>
+                                            <button @click="addCheck" 
+                                                    class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 flex items-center">
+                                                ➕ 添加检查项
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-3">
+                                        <div v-for="(check, index) in config.pageAssertions.midsceneTextCheck.checks" :key="index"
+                                             class="border rounded-md p-4 bg-white">
+                                            <div class="flex items-center justify-between mb-3">
+                                                <input v-model="check.name" type="text"
+                                                       class="border border-gray-300 rounded px-3 py-2 text-sm font-medium flex-1 mr-3"
+                                                       placeholder="检查名称（如：不是白屏）">
+                                                <button @click="deleteCheck(index)" 
+                                                        class="text-red-600 hover:text-red-900 px-3 py-2 rounded hover:bg-red-50">
+                                                    🗑️ 删除
+                                                </button>
                                             </div>
-                                            <textarea v-model="check.prompt" 
-                                                      class="w-full border border-gray-200 rounded text-xs p-2 h-16"
-                                                      :placeholder="check.description"></textarea>
+                                            <div class="mb-3">
+                                                <label class="block text-xs text-gray-600 mb-1">AI 检查提示（描述要检查的内容）</label>
+                                                <textarea v-model="check.prompt" 
+                                                          class="w-full border border-gray-300 rounded text-sm p-3 h-24"
+                                                          placeholder="例如：页面是否显示权限错误信息？"></textarea>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="block text-xs text-gray-600 mb-1">失败提示消息</label>
+                                                <input v-model="check.failureMessage" type="text"
+                                                       class="w-full border border-gray-300 rounded text-sm p-2"
+                                                       placeholder="检测失败时显示的消息">
+                                            </div>
+                                            <div class="grid grid-cols-2 gap-3 text-sm">
+                                                <label class="flex items-center">
+                                                    <input v-model="check.failOnTrue" type="checkbox" 
+                                                           class="rounded border-gray-300 text-blue-600 shadow-sm mr-2">
+                                                    <span class="text-gray-700">检测为真时失败</span>
+                                                </label>
+                                                <label class="flex items-center">
+                                                    <input v-model="check.failFast" type="checkbox" 
+                                                           class="rounded border-gray-300 text-blue-600 shadow-sm mr-2">
+                                                    <span class="text-gray-700">立即失败</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div v-if="config.pageAssertions.midsceneTextCheck.checks.length === 0"
+                                             class="text-center text-gray-500 py-8 border-2 border-dashed rounded-md">
+                                            暂无检查项，点击"添加检查项"按钮创建
                                         </div>
                                     </div>
                                 </div>
@@ -323,9 +330,9 @@
                                 class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition-colors flex items-center">
                             📋 复制到剪贴板
                         </button>
-                        <button @click="downloadRoutes" 
+                        <button @click="downloadMergedConfig" 
                                 class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition-colors flex items-center">
-                            🛣️ 下载路由文件
+                            🧩 下载合并配置（含路由）
                         </button>
                     </div>
                     
@@ -375,46 +382,52 @@
                         include: '*',
                         pageAssertions: {
                             enabled: true,
-                            domPreCheck: {
-                                enableNetworkCheck: true,
-                                networkCheckWindowMs: 8000,
-                                enableConsoleErrorCheck: true,
-                                consoleErrorCheckWindowMs: 5000
-                            },
                             midsceneTextCheck: {
                                 enabled: true,
                                 timeout: 8000,
                                 concurrency: 2,
-                                checks: {
-                                    blankScreen: {
-                                        enabled: true,
-                                        name: '空白页面检查',
-                                        type: 'error',
-                                        prompt: '页面是否显示为空白、没有任何有意义的内容，或者只显示加载中的状态？',
-                                        description: '检测页面是否为空白或只有加载状态'
+                                checks: [
+                                    {
+                                        name: "非白屏检查",
+                                        type: "aiBoolean",
+                                        prompt: "页面是否是白屏、空白页面或只显示加载状态？",
+                                        expectation: false,
+                                        failOnTrue: true,
+                                        failFast: false,
+                                        timeout: 5000,
+                                        failureMessage: "检测到白屏或空白页面"
                                     },
-                                    permissionError: {
-                                        enabled: true,
-                                        name: '权限错误检查',
-                                        type: 'error',
-                                        prompt: '页面是否显示"无权限"、"权限不足"、"请联系管理员"等权限相关的错误信息？',
-                                        description: '检测权限拒绝相关的错误信息'
+                                    {
+                                        name: "无权限错误检查",
+                                        type: "aiBoolean",
+                                        prompt: "页面是否显示权限相关的错误信息？比如'没有权限'、'权限不足'、'访问被拒绝'等",
+                                        expectation: false,
+                                        failOnTrue: true,
+                                        failFast: true,
+                                        timeout: 5000,
+                                        failureMessage: "检测到权限错误"
                                     },
-                                    apiError: {
-                                        enabled: true,
-                                        name: 'API错误检查',
-                                        type: 'error',
-                                        prompt: '页面是否显示"网络错误"、"服务器错误"、"加载失败"等API调用失败的错误信息？',
-                                        description: '检测API调用失败的错误信息'
+                                    {
+                                        name: "无接口错误检查",
+                                        type: "aiBoolean",
+                                        prompt: "页面是否显示接口错误或网络错误？比如'请求失败'、'加载失败'、'网络错误'、'服务异常'等",
+                                        expectation: false,
+                                        failOnTrue: true,
+                                        failFast: false,
+                                        timeout: 5000,
+                                        failureMessage: "检测到接口或网络错误"
                                     },
-                                    validContent: {
-                                        enabled: true,
-                                        name: '有效内容检查',
-                                        type: 'success',
-                                        prompt: '页面是否显示了正常的业务内容，比如数据列表、表单、图表等有意义的信息？',
-                                        description: '检测页面是否有有效的业务内容'
+                                    {
+                                        name: "有效业务内容检查",
+                                        type: "aiBoolean",
+                                        prompt: "页面是否包含有效的业务内容？（有实际的数据、表格、表单、视频等，不是错误页面、空状态页面或纯加载页面）",
+                                        expectation: true,
+                                        failOnFalse: true,
+                                        failFast: false,
+                                        timeout: 5000,
+                                        failureMessage: "页面缺少有效的业务内容"
                                     }
-                                }
+                                ]
                             }
                         }
                     },
@@ -427,14 +440,21 @@
                 },
                 routesJson() {
                     return JSON.stringify({ routes: this.routes }, null, 2);
+                },
+                mergedConfigJson() {
+                    const cfg = JSON.parse(this.configJson);
+                    if (this.routes && this.routes.length > 0) {
+                        cfg.routes = this.routes.map(r => ({ menuText: r.menuText, url: r.url, level: r.level || 1 }));
+                    }
+                    return JSON.stringify(cfg, null, 2);
                 }
             },
             methods: {
                 downloadConfig() {
                     this.downloadJson(this.configJson, 'menu-tester-config.json');
                 },
-                downloadRoutes() {
-                    this.downloadJson(this.routesJson, 'routes.json');
+                downloadMergedConfig() {
+                    this.downloadJson(this.mergedConfigJson, 'menu-tester-config.json');
                 },
                 downloadJson(content, filename) {
                     const blob = new Blob([content], { type: 'application/json' });
@@ -507,11 +527,98 @@
                 deleteRoute(id) {
                     if (confirm('确定要删除这个路由吗？')) {
                         this.routes = this.routes.filter(r => r.id !== id);
+                        console.log('删除路由，剩余:', this.routes.length);
                     }
                 },
                 clearRoutes() {
                     if (confirm('确定要清空所有路由吗？')) {
                         this.routes = [];
+                    }
+                },
+                addCheck() {
+                    // 确保 checks 是数组
+                    if (!Array.isArray(this.config.pageAssertions.midsceneTextCheck.checks)) {
+                        this.config.pageAssertions.midsceneTextCheck.checks = [];
+                    }
+                    
+                    const newCheck = {
+                        name: "自定义检查" + (this.config.pageAssertions.midsceneTextCheck.checks.length + 1),
+                        type: "aiBoolean",
+                        prompt: "",
+                        expectation: false,
+                        failOnTrue: false,
+                        failOnFalse: false,
+                        failFast: false,
+                        timeout: 5000,
+                        failureMessage: ""
+                    };
+                    // 使用扩展运算符创建新数组，触发 Vue 响应式更新
+                    this.config.pageAssertions.midsceneTextCheck.checks = [
+                        ...this.config.pageAssertions.midsceneTextCheck.checks,
+                        newCheck
+                    ];
+                    console.log('添加检查项:', newCheck);
+                    console.log('当前检查项数量:', this.config.pageAssertions.midsceneTextCheck.checks.length);
+                },
+                deleteCheck(index) {
+                    // 确保 checks 是数组
+                    if (!Array.isArray(this.config.pageAssertions.midsceneTextCheck.checks)) {
+                        console.error('checks 不是数组:', typeof this.config.pageAssertions.midsceneTextCheck.checks);
+                        return;
+                    }
+                    
+                    if (confirm('确定要删除这个检查项吗？')) {
+                        // 使用 filter 创建新数组，触发 Vue 响应式更新
+                        this.config.pageAssertions.midsceneTextCheck.checks = 
+                            this.config.pageAssertions.midsceneTextCheck.checks.filter((_, i) => i !== index);
+                        console.log('删除检查项，剩余:', this.config.pageAssertions.midsceneTextCheck.checks.length);
+                    }
+                },
+                resetChecksToDefault() {
+                    if (confirm('确定要恢复为默认的 4 个检查项吗？当前的自定义检查项将被清除。')) {
+                        this.config.pageAssertions.midsceneTextCheck.checks = [
+                            {
+                                name: "非白屏检查",
+                                type: "aiBoolean",
+                                prompt: "页面是否是白屏、空白页面或只显示加载状态？",
+                                expectation: false,
+                                failOnTrue: true,
+                                failFast: false,
+                                timeout: 5000,
+                                failureMessage: "检测到白屏或空白页面"
+                            },
+                            {
+                                name: "无权限错误检查",
+                                type: "aiBoolean",
+                                prompt: "页面是否显示权限相关的错误信息？比如'没有权限'、'权限不足'、'访问被拒绝'等",
+                                expectation: false,
+                                failOnTrue: true,
+                                failFast: true,
+                                timeout: 5000,
+                                failureMessage: "检测到权限错误"
+                            },
+                            {
+                                name: "无接口错误检查",
+                                type: "aiBoolean",
+                                prompt: "页面是否显示接口错误或网络错误？比如'请求失败'、'加载失败'、'网络错误'、'服务异常'等",
+                                expectation: false,
+                                failOnTrue: true,
+                                failFast: false,
+                                timeout: 5000,
+                                failureMessage: "检测到接口或网络错误"
+                            },
+                            {
+                                name: "有效业务内容检查",
+                                type: "aiBoolean",
+                                prompt: "页面是否包含有效的业务内容？（有实际的数据、表格、表单、视频等，不是错误页面、空状态页面或纯加载页面）",
+                                expectation: true,
+                                failOnFalse: true,
+                                failFast: false,
+                                timeout: 5000,
+                                failureMessage: "页面缺少有效的业务内容"
+                            }
+                        ];
+                        console.log('已恢复默认检查项，共 4 个');
                     }
                 }
             },
@@ -521,6 +628,17 @@
                 if (savedConfig) {
                     try {
                         const parsed = JSON.parse(savedConfig);
+                        
+                        // 兼容旧格式：如果 checks 是对象，转换为数组
+                        if (parsed.pageAssertions?.midsceneTextCheck?.checks) {
+                            const checks = parsed.pageAssertions.midsceneTextCheck.checks;
+                            if (!Array.isArray(checks) && typeof checks === 'object') {
+                                // 从对象转换为数组
+                                parsed.pageAssertions.midsceneTextCheck.checks = Object.values(checks);
+                                console.log('已将 checks 从对象格式转换为数组格式');
+                            }
+                        }
+                        
                         this.config = { ...this.config, ...parsed };
                     } catch (e) {
                         console.warn('Failed to load saved config:', e);

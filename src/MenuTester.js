@@ -107,8 +107,19 @@ class MenuTester {
     try {
       await this.progressTracker.updateStep('route_mode_testing');
       
-      // 1. 从缓存加载路由表
-      const routes = await this.loadRoutesFromCache();
+      // 1. 优先使用配置中的内联路由，其次从缓存加载
+      let routes = [];
+      if (Array.isArray(this.config.routes) && this.config.routes.length > 0) {
+        routes = this.config.routes.map((r, idx) => ({
+          menuText: r.menuText || r.text || `Route ${idx + 1}`,
+          url: r.url,
+          level: r.level || 1,
+          recordedAt: r.recordedAt || new Date().toISOString()
+        }));
+        logger.info(`使用配置文件内联路由，共 ${routes.length} 条`);
+      } else {
+        routes = await this.loadRoutesFromCache();
+      }
       
       if (routes.length === 0) {
         throw new Error('未找到路由缓存，请先运行 AI 模式建立路由缓存，或手动导入路由配置');

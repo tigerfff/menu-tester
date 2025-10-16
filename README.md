@@ -43,23 +43,77 @@ echo "OPENAI_API_KEY=sk-xxx" > .env
 
 可选：`OPENAI_BASE_URL` 指向公司内网网关，客户端无需持有真实 Key。
 
-### 配置文件示例（可选）
+### 配置文件示例
 
+**基础配置：**
 ```json
 {
   "url": "https://admin.example.com",
   "token": "your-access-token",
   "tokenMethod": "cookie",
   "tokenName": "access_token",
+  "mode": "hybrid",
   "depth": 2,
   "timeout": 6000,
   "headless": true,
-  "output": "./results",
   "retry": 2,
   "skip": "logout,exit,注销",
-  "include": "*",
   "screenshots": false,
   "verbose": false
+}
+```
+
+**单文件配置（含路由）：**
+```json
+{
+  "url": "https://admin.example.com",
+  "token": "your-access-token",
+  "mode": "route",
+  "routes": [
+    { "menuText": "首页", "url": "https://admin.example.com/home" },
+    { "menuText": "用户管理", "url": "https://admin.example.com/users" },
+    { "menuText": "系统设置", "url": "https://admin.example.com/settings" }
+  ]
+}
+```
+
+**完整配置（含页面断言）：**
+```json
+{
+  "url": "https://admin.example.com",
+  "token": "your-access-token",
+  "mode": "hybrid",
+  "timeout": 6000,
+  "headless": true,
+  "screenshots": false,
+  "pageAssertions": {
+    "enabled": true,
+    "midsceneTextCheck": {
+      "enabled": true,
+      "timeout": 8000,
+      "concurrency": 2,
+      "checks": [
+        {
+          "name": "非白屏检查",
+          "type": "aiBoolean",
+          "prompt": "页面是否是白屏、空白页面或只显示加载状态？",
+          "failOnTrue": true,
+          "failFast": false,
+          "timeout": 5000,
+          "failureMessage": "检测到白屏或空白页面"
+        },
+        {
+          "name": "无权限错误检查",
+          "type": "aiBoolean",
+          "prompt": "页面是否显示权限相关的错误信息？",
+          "failOnTrue": true,
+          "failFast": true,
+          "timeout": 5000,
+          "failureMessage": "检测到权限错误"
+        }
+      ]
+    }
+  }
 }
 ```
 
@@ -78,22 +132,77 @@ menu-tester serve --no-open    # 不自动打开浏览器
 ### 命令行
 
 ```bash
-# 使用配置文件
+# 使用配置文件（推荐）
 menu-tester test --config config.json
 
-# 路由模式
-menu-tester routes import routes.json
-menu-tester test --mode route
+# 单文件配置（含路由）
+menu-tester test --config config-with-routes.json
 
 # AI 模式
 menu-tester test --mode ai --config config.json
 
-# 混合模式（默认推荐）
+# 混合模式（默认）
 menu-tester test --mode hybrid --config config.json
+
+# 路由模式（传统方式：分离的路由文件）
+menu-tester routes import routes.json
+menu-tester test --mode route
 
 # 详细日志
 menu-tester test --config config.json --verbose
 ```
+
+## 页面断言配置
+
+页面断言用于智能验证页面内容，检测常见错误（白屏、权限错误、接口错误等）。
+
+### 配置说明
+
+**`pageAssertions.enabled`** - 页面断言总开关（默认 true）
+
+**`midsceneTextCheck`** - AI 文本检查配置：
+- `enabled` - 启用 AI 语义检查
+- `timeout` - 单个检查超时时间（毫秒）
+- `concurrency` - 并发检查数（1-5）
+- `checks` - 检查项数组（可自定义）
+
+### 检查项配置
+
+每个检查项包含以下字段：
+
+- **`name`** - 检查名称（如："非白屏检查"）
+- **`type`** - 检查类型（`aiBoolean` 或 `aiQuery`）
+- **`prompt`** - AI 检查提示词（描述要检查的内容）
+- **`failOnTrue`** - 检测为真时失败（用于检测错误情况）
+- **`failFast`** - 立即失败（此项失败时跳过后续检查）
+- **`timeout`** - 单项超时时间（毫秒）
+- **`failureMessage`** - 失败时的提示消息
+
+### 默认检查项
+
+1. **非白屏检查** - 检测页面是否白屏或空白（`failFast: false`）
+2. **无权限错误检查** - 检测权限错误（`failFast: true`，立即失败）
+3. **无接口错误检查** - 检测接口/网络错误（`failFast: false`）
+4. **有效业务内容检查** - 检测是否有有效业务内容（`failFast: false`）
+
+### Web 界面管理
+
+在 Web 配置界面的"页面断言"选项卡中，可以：
+- ✅ 启用/禁用页面断言
+- ➕ 添加自定义检查项
+- ✏️ 编辑检查项的提示词和配置
+- 🗑️ 删除不需要的检查项
+- 🔄 恢复为默认的 4 个检查项
+
+## 截图保存
+
+- **开启方式**：在配置中设置 `"screenshots": true`，或在 Web 配置界面勾选"截图保存"。
+- **触发时机**：每次页面验证完成后（无论成功/失败），都会尝试截图作为证据。
+- **保存位置**：由 Midscene 代理统一管理，落盘至项目根目录下的 `midscene_run/` 的本次会话目录中；同时会在 `midscene_run/report/{会话ID}.html` 报告中引用展示。
+- **命名规则**：`menu-{菜单id}-{success|failed}-{时间戳}.png`，便于定位与比对。
+- **查看方式**：
+  - 运行结束后，打开 `midscene_run/report/{会话ID}.html` 查看可视化报告与截图。
+  - 若需原图，进入 `midscene_run/` 下最新会话目录，按上述文件名前缀查找。
 
 ## 常见问题（FAQ）
 
