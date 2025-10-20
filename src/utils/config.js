@@ -1,6 +1,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const { logger } = require('./logger');
+const { applyEnvFromConfig } = require('./envConfig');
 
 /**
  * Load configuration from file
@@ -27,6 +28,10 @@ async function loadConfig(configPath) {
     }
 
     logger.debug(`Loaded configuration from: ${fullPath}`);
+    
+    // 应用配置文件中的环境变量设置
+    applyEnvFromConfig(config);
+    
     return config;
   } catch (error) {
     throw new Error(`Failed to load configuration: ${error.message}`);

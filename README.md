@@ -28,8 +28,33 @@ npx playwright install chromium
 
 ## 配置
 
-### 环境变量（推荐其一）
+### AI 服务配置（推荐其一）
 
+**方式1：配置文件（推荐）**
+
+OpenAI 官方：
+```json
+{
+  "url": "https://your-app.com",
+  "token": "your-token",
+  "env": {
+    "OPENAI_API_KEY": "sk-xxx"
+  }
+}
+```
+
+阿里千问（通义千问）：
+```json
+{
+  "env": {
+    "OPENAI_API_KEY": "sk-xxx",
+    "OPENAI_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "MIDSCENE_MODEL_NAME": "qwen-vl-plus"
+  }
+}
+```
+
+**方式2：环境变量**
 ```bash
 # 临时设置并运行（单次）
 OPENAI_API_KEY=sk-xxx menu-tester test --config config.json
@@ -37,11 +62,18 @@ OPENAI_API_KEY=sk-xxx menu-tester test --config config.json
 # 会话级设置
 export OPENAI_API_KEY=sk-xxx
 
-# 使用 .env（在运行目录创建）
+# 使用 .env 文件（在运行目录创建）
 echo "OPENAI_API_KEY=sk-xxx" > .env
 ```
 
-可选：`OPENAI_BASE_URL` 指向公司内网网关，客户端无需持有真实 Key。
+**优先级**：系统环境变量 > 配置文件 `env` 字段 > .env 文件
+
+💡 **提示**：
+- OpenAI 官方无需设置 `MIDSCENE_MODEL_NAME`
+- 阿里千问必须设置 `MIDSCENE_MODEL_NAME`（如 `qwen-vl-plus`）
+- 可设置 `OPENAI_BASE_URL` 指向公司内网网关
+
+📖 **详细配置**：[阿里千问配置指南](./docs/qwen-config-example.md)
 
 ### 配置文件示例
 
@@ -270,10 +302,14 @@ menu-tester routes test --config config.json  # updateBaseline=false
 
 ## 常见问题（FAQ）
 
-- **如何提供 AI 密钥？** 使用环境变量（临时、export、或 .env）。不建议把密钥写入代码或包内。
+- **如何提供 AI 密钥？** 
+  - 推荐：在配置文件的 `env` 字段中设置
+  - 或使用环境变量（临时、export、或 .env）
+  - 注意：包含密钥的配置文件请勿提交到版本控制系统
 - **截图有什么用？** 便于调试失败用例、生成报告证据，CI 排查更直观。
 - **token 与 OPENAI_API_KEY 有何区别？** 前者是被测系统的访问令牌；后者是调用大模型的凭证。
 - **组织内如何更安全？** 配置 `OPENAI_BASE_URL` 指向公司网关，客户端无需真实 Key。
+- **配置文件中的密钥安全吗？** 建议将包含密钥的配置文件加入 `.gitignore`，使用模板文件共享配置结构。
 
 ## 许可证
 

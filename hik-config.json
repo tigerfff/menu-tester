@@ -1,27 +1,31 @@
 {
-  "url": "https://pb.hik-cloud.com/chain/index.html#/home",
-  "token": "771762a6-5db6-4069-9c39-e4ea0a11f090",
+  "url": "https://www.hik-cloud.com/chain/index.html#/home",
+  "token": "c2d24e88-fea6-44cf-9b01-45daf317249d",
   "tokenMethod": "cookie",
   "tokenName": "accessToken",
   "mode": "route",
   "timeout": 6000,
   "headless": true,
-  "verbose": false,
   "screenshots": true,
-  "skip": "logout,exit,注销",
-  "include": "*",
   "screenshotComparison": {
     "enabled": true,
-    "threshold": 0.2,
+    "threshold": 0.1,
     "baselineDir": "./screenshots/baseline",
     "diffDir": "./screenshots/diff",
     "updateBaseline": false,
     "failOnDiff": false
   },
+  "env": {
+    "OPENAI_API_KEY": "sk-825f82941e2f4fac9159e1bc31dc55d2",
+    "OPENAI_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "MIDSCENE_MODEL_NAME": "qwen-vl-max-latest"
+  },
+  "skip": "logout,exit,注销",
+  "include": "*",
   "pageAssertions": {
     "enabled": true,
     "domPreCheck": {
-      "enableNetworkCheck": true, 
+      "enableNetworkCheck": true,
       "networkCheckWindowMs": 8000,
       "enableConsoleErrorCheck": true,
       "consoleErrorCheckWindowMs": 5000,
@@ -72,17 +76,6 @@
           "failFast": false,
           "timeout": 5000,
           "failureMessage": "页面缺少有效的业务内容"
-        },
-        {
-          "name": "自定义检查5",
-          "type": "aiBoolean",
-          "prompt": "",
-          "expectation": false,
-          "failOnTrue": false,
-          "failOnFalse": false,
-          "failFast": false,
-          "timeout": 5000,
-          "failureMessage": ""
         }
       ]
     }
@@ -90,22 +83,22 @@
   "routes": [
     {
       "menuText": "home",
-      "url": "https://pb.hik-cloud.com/chain/index.html#/home",
+      "url": "https://www.hik-cloud.com/chain/index.html#/home",
       "level": 1
     },
     {
       "menuText": "config-template",
-      "url": "https://pb.hik-cloud.com/chain/index.html#/inspect/config/template",
+      "url": "https://www.hik-cloud.com/chain/index.html#/inspect/config/template",
       "level": 1
     },
     {
       "menuText": "evaluate",
-      "url": "https://pb.hik-cloud.com/chain/index.html#/inspect/evaluate",
+      "url": "https://www.hik-cloud.com/chain/index.html#/inspect/evaluate",
       "level": 1
     },
     {
       "menuText": "inspect-spotCheck",
-      "url": "https://pb.hik-cloud.com/chain/index.html#/inspect/spotCheck",
+      "url": "https://www.hik-cloud.com/chain/index.html#/inspect/spotCheck",
       "level": 1
     }
   ]

@@ -10,3 +10,8 @@ config/hik-config.json
 # Screenshot comparison
 screenshots/diff/
 *.png.tmp
+
+# Configuration files with secrets
+hik-config.json
+*-config.json
+!config/example.json

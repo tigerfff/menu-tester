@@ -1,6 +1,11 @@
 {
   "url": "https://admin.example.com",
   "token": "your-access-token-here",
+  "env": {
+    "OPENAI_API_KEY": "sk-your-openai-api-key-here",
+    "OPENAI_BASE_URL": "https://api.openai.com/v1",
+    "MIDSCENE_MODEL_NAME": ""
+  },
   "options": {
     "depth": 2,
     "timeout": 10000,
