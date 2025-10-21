@@ -42,3 +42,6 @@ coverage/
 # 构建文件
 dist/
 build/
+
+# 测试截图
+screenshots/

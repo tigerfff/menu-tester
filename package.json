@@ -1,5 +1,5 @@
 {
-  "name": "@hik-cloud/midscene-menu-tester",
+  "name": "menu-tester",
   "version": "1.0.0",
   "description": "AI-powered menu testing CLI tool using Playwright and Midscene.js",
   "main": "src/MenuTester.js",
@@ -10,9 +10,8 @@
     "dev": "node bin/menu-tester.js",
     "serve": "node bin/menu-tester.js serve",
     "build": "echo 'No build step needed'",
-    "test": "echo 'Tests not implemented yet'",
-    "postinstall": "npx playwright install chromium",
-    "prepublishOnly": "npm run test"
+    "test": "echo 'Tests not implemented yet' && exit 0",
+    "postinstall": "npx playwright install chromium"
   },
   "keywords": [
     "menu-testing",
@@ -39,11 +38,14 @@
   "files": [
     "bin/",
     "src/",
-    "config/",
-    "README.md"
+    "config/example.json",
+    "docs/",
+    "README.md",
+    "LICENSE"
   ],
   "dependencies": {
     "@midscene/web": "^0.26.6",
+    "@playwright/test": "^1.48.0",
     "chalk": "^4.1.2",
     "commander": "^12.0.0",
     "dotenv": "^16.3.1",

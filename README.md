@@ -20,7 +20,7 @@
 
 ```bash
 # 全局安装（推荐）
-npm install -g @hik-cloud/midscene-menu-tester
+npm install -g menu-tester
 
 # 如需手动安装浏览器
 npx playwright install chromium
@@ -33,6 +33,7 @@ npx playwright install chromium
 **方式1：配置文件（推荐）**
 
 OpenAI 官方：
+
 ```json
 {
   "url": "https://your-app.com",
@@ -44,6 +45,7 @@ OpenAI 官方：
 ```
 
 阿里千问（通义千问）：
+
 ```json
 {
   "env": {
@@ -55,6 +57,7 @@ OpenAI 官方：
 ```
 
 **方式2：环境变量**
+
 ```bash
 # 临时设置并运行（单次）
 OPENAI_API_KEY=sk-xxx menu-tester test --config config.json
@@ -69,6 +72,7 @@ echo "OPENAI_API_KEY=sk-xxx" > .env
 **优先级**：系统环境变量 > 配置文件 `env` 字段 > .env 文件
 
 💡 **提示**：
+
 - OpenAI 官方无需设置 `MIDSCENE_MODEL_NAME`
 - 阿里千问必须设置 `MIDSCENE_MODEL_NAME`（如 `qwen-vl-plus`）
 - 可设置 `OPENAI_BASE_URL` 指向公司内网网关
@@ -78,6 +82,7 @@ echo "OPENAI_API_KEY=sk-xxx" > .env
 ### 配置文件示例
 
 **基础配置：**
+
 ```json
 {
   "url": "https://admin.example.com",
@@ -96,6 +101,7 @@ echo "OPENAI_API_KEY=sk-xxx" > .env
 ```
 
 **单文件配置（含路由）：**
+
 ```json
 {
   "url": "https://admin.example.com",
@@ -110,6 +116,7 @@ echo "OPENAI_API_KEY=sk-xxx" > .env
 ```
 
 **完整配置（含页面断言）：**
+
 ```json
 {
   "url": "https://admin.example.com",
@@ -193,6 +200,7 @@ menu-tester test --config config.json --verbose
 **`pageAssertions.enabled`** - 页面断言总开关（默认 true）
 
 **`midsceneTextCheck`** - AI 文本检查配置：
+
 - `enabled` - 启用 AI 语义检查
 - `timeout` - 单个检查超时时间（毫秒）
 - `concurrency` - 并发检查数（1-5）
@@ -220,6 +228,7 @@ menu-tester test --config config.json --verbose
 ### Web 界面管理
 
 在 Web 配置界面的"页面断言"选项卡中，可以：
+
 - ✅ 启用/禁用页面断言
 - ➕ 添加自定义检查项
 - ✏️ 编辑检查项的提示词和配置
@@ -245,6 +254,7 @@ menu-tester test --config config.json --verbose
 **1. 配置截图对比**
 
 在配置文件中添加：
+
 ```json
 {
   "screenshots": true,
@@ -260,12 +270,14 @@ menu-tester test --config config.json --verbose
 ```
 
 **2. 首次运行（建立基线）**
+
 ```bash
 # 设置 updateBaseline: true，使用AI模式建立基线
 menu-tester --config config/hik-config.json
 ```
 
 **3. 回归测试（对比模式）**
+
 ```bash
 # 设置 updateBaseline: false，使用路由模式快速对比
 menu-tester routes test --config config/hik-config.json
@@ -281,6 +293,7 @@ menu-tester routes test --config config/hik-config.json
 ### 使用场景
 
 **AI发现 + 路由回归**（推荐）
+
 ```bash
 # Day 1: AI模式全面发现，建立基线
 menu-tester --config config.json  # updateBaseline=true
@@ -291,18 +304,18 @@ menu-tester routes test --config config.json  # updateBaseline=false
 
 ### 配置说明
 
-| 配置项 | 说明 |
-|--------|------|
-| `enabled` | 是否启用截图对比 |
-| `threshold` | 差异阈值（0-1），越小越严格 |
-| `updateBaseline` | 是否更新基线截图 |
-| `failOnDiff` | 发现差异时是否立即失败 |
+| 配置项             | 说明                        |
+| ------------------ | --------------------------- |
+| `enabled`        | 是否启用截图对比            |
+| `threshold`      | 差异阈值（0-1），越小越严格 |
+| `updateBaseline` | 是否更新基线截图            |
+| `failOnDiff`     | 发现差异时是否立即失败      |
 
 📖 **详细文档**：[截图对比功能使用指南](./docs/screenshot-comparison-guide.md)
 
 ## 常见问题（FAQ）
 
-- **如何提供 AI 密钥？** 
+- **如何提供 AI 密钥？**
   - 推荐：在配置文件的 `env` 字段中设置
   - 或使用环境变量（临时、export、或 .env）
   - 注意：包含密钥的配置文件请勿提交到版本控制系统
