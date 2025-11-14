@@ -84,9 +84,32 @@ function validateConfig(config) {
     if (!Array.isArray(config.routes)) {
       errors.push('routes must be an array when provided');
     } else {
-      const invalid = config.routes.find(r => !r || typeof r !== 'object' || !r.menuText || !r.url);
-      if (invalid) {
-        errors.push('each route item must include menuText and url');
+      for (const route of config.routes) {
+        if (!route || typeof route !== 'object' || !route.menuText || !route.url) {
+          errors.push('each route item must include menuText and url');
+          break;
+        }
+        
+        // 验证 screenshotScenarios（如果存在）
+        if (route.screenshotScenarios !== undefined) {
+          if (!Array.isArray(route.screenshotScenarios)) {
+            errors.push(`route "${route.menuText}" screenshotScenarios must be an array`);
+            break;
+          }
+          
+          for (const scenario of route.screenshotScenarios) {
+            if (!scenario || typeof scenario !== 'object' || !scenario.type) {
+              errors.push(`route "${route.menuText}" screenshotScenarios must have type field`);
+              break;
+            }
+            
+            const validTypes = ['default', 'tab', 'modal', 'dialog', 'dropdown', 'custom'];
+            if (!validTypes.includes(scenario.type)) {
+              errors.push(`route "${route.menuText}" screenshotScenario type must be one of: ${validTypes.join(', ')}`);
+              break;
+            }
+          }
+        }
       }
     }
   }

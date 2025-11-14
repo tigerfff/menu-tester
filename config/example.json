@@ -6,10 +6,39 @@
   "retry": 2,
   "verbose": false,
   "routes": [
-    { "menuText": "首页", "url": "https://admin.example.com/home" },
-    { "menuText": "巡检中心", "url": "https://admin.example.com/inspect" },
+    { 
+      "menuText": "首页", 
+      "url": "https://admin.example.com/home" 
+    },
+    { 
+      "menuText": "巡检中心", 
+      "url": "https://admin.example.com/inspect",
+      "screenshotScenarios": [
+        {
+          "type": "default",
+          "description": "默认页面"
+        },
+        {
+          "type": "tab",
+          "text": "待处理",
+          "description": "待处理 tab"
+        },
+        {
+          "type": "tab",
+          "text": "已完成",
+          "description": "已完成 tab"
+        },
+        {
+          "type": "modal",
+          "trigger": "点击'新增巡检'按钮",
+          "description": "新增巡检弹窗",
+          "closeAfter": true
+        }
+      ]
+    },
     { "menuText": "系统设置", "url": "https://admin.example.com/settings" }
   ],
+  "autoDiscoverTabs": true,
   "tokenInjection": {
     "method": "cookie",
     "name": "access_token"

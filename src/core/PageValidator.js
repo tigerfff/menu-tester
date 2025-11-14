@@ -663,9 +663,10 @@ class PageValidator {
    * Take screenshot for evidence (with optional comparison)
    * @param {object} menu - Menu item
    * @param {boolean} success - Whether validation was successful
+   * @param {string} description - Optional scenario description for filename
    * @returns {string|object} Screenshot path or comparison result
    */
-  async takeScreenshot(menu, success) {
+  async takeScreenshot(menu, success, description = null) {
     if (!this.config.screenshots) {
       return null;
     }
@@ -677,32 +678,43 @@ class PageValidator {
         url: menu.url || this.page.url()
       };
 
+      // 生成场景标识（用于文件名）
+      const scenarioSuffix = description 
+        ? `-${description.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase().substring(0, 30)}`
+        : '';
+
       // 如果启用了截图对比功能
       if (this.screenshotComparator) {
         // 获取截图 buffer
         const screenshot = await this.page.screenshot({ fullPage: false });
         
+        // 创建带场景信息的菜单对象用于对比
+        const menuForComparison = {
+          ...menuWithUrl,
+          scenario: description || 'default'
+        };
+        
         // 执行对比或保存基线
         const comparisonResult = await this.screenshotComparator.compareOrSaveBaseline(
-          menuWithUrl, 
+          menuForComparison, 
           screenshot
         );
         
         // 记录到 Midscene 日志
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const status = success ? 'success' : 'failed';
-        const filename = `menu-${comparisonResult.key}-${status}-${timestamp}`;
+        const filename = `menu-${comparisonResult.key}${scenarioSuffix}-${status}-${timestamp}`;
         
         await this.agent.logScreenshot(filename, {
-          content: `Menu: ${menuWithUrl.text}, Status: ${status}, Comparison: ${comparisonResult.type}`
+          content: `Menu: ${menuWithUrl.text}${description ? ` - ${description}` : ''}, Status: ${status}, Comparison: ${comparisonResult.type}`
         });
         
         // 如果是对比模式且发现差异
         if (comparisonResult.type === 'comparison') {
           if (comparisonResult.match) {
-            logger.info(`✅ 截图对比通过: ${comparisonResult.key} (差异 ${comparisonResult.diffPercentage}%)`);
+            logger.info(`✅ 截图对比通过: ${comparisonResult.key}${description ? ` (${description})` : ''} (差异 ${comparisonResult.diffPercentage}%)`);
           } else {
-            logger.warn(`⚠️  截图差异检测: ${comparisonResult.key} (差异 ${comparisonResult.diffPercentage}%)`);
+            logger.warn(`⚠️  截图差异检测: ${comparisonResult.key}${description ? ` (${description})` : ''} (差异 ${comparisonResult.diffPercentage}%)`);
             if (comparisonResult.diffPath) {
               logger.warn(`   差异图: ${comparisonResult.diffPath}`);
             }
@@ -713,7 +725,7 @@ class PageValidator {
             }
           }
         } else if (comparisonResult.type === 'baseline') {
-          logger.info(`📸 ${comparisonResult.message}: ${comparisonResult.key}`);
+          logger.info(`📸 ${comparisonResult.message}: ${comparisonResult.key}${description ? ` (${description})` : ''}`);
         }
         
         return {
@@ -725,10 +737,10 @@ class PageValidator {
       // 原有的简单截图逻辑
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const status = success ? 'success' : 'failed';
-      const filename = `menu-${menuWithUrl.id || 'unknown'}-${status}-${timestamp}`;
+      const filename = `menu-${menuWithUrl.id || 'unknown'}${scenarioSuffix}-${status}-${timestamp}`;
       
       await this.agent.logScreenshot(filename, {
-        content: `Menu: ${menuWithUrl.text}, Status: ${status}`
+        content: `Menu: ${menuWithUrl.text}${description ? ` - ${description}` : ''}, Status: ${status}`
       });
 
       return filename;

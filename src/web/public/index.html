@@ -286,6 +286,7 @@
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">菜单名称</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">场景数</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                                 </tr>
                             </thead>
@@ -293,18 +294,141 @@
                                 <tr v-for="route in routes" :key="route.id" class="hover:bg-gray-50">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ route.menuText }}</td>
                                     <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">{{ route.url }}</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <span v-if="route.screenshotScenarios && route.screenshotScenarios.length > 0">
+                                            {{ route.screenshotScenarios.length }} 个场景
+                                        </span>
+                                        <span v-else class="text-gray-400">无</span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                                        <button @click="editRouteScenarios(route)" 
+                                                class="text-blue-600 hover:text-blue-900 transition-colors">📸 场景</button>
                                         <button @click="deleteRoute(route.id)" 
                                                 class="text-red-600 hover:text-red-900 transition-colors">🗑️ 删除</button>
                                     </td>
                                 </tr>
                                 <tr v-if="routes.length === 0">
-                                    <td colspan="3" class="px-6 py-8 text-center text-gray-500">
+                                    <td colspan="4" class="px-6 py-8 text-center text-gray-500">
                                         暂无路由数据，请导入或手动添加路由
                                     </td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    
+                    <!-- 截图场景配置模态框 -->
+                    <div v-if="showScenarioModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                            <div class="p-6">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-lg font-semibold text-gray-900">
+                                        📸 配置截图场景 - {{ editingRoute?.menuText }}
+                                    </h3>
+                                    <button @click="closeScenarioModal" 
+                                            class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <label class="text-sm font-medium text-gray-700">自动发现 Tab</label>
+                                        <input v-model="config.autoDiscoverTabs" type="checkbox" 
+                                               class="rounded border-gray-300 text-blue-600">
+                                    </div>
+                                    <p class="text-xs text-gray-500">未配置场景时，自动发现页面上的 tab 并截图</p>
+                                </div>
+                                
+                                <div class="space-y-3 mb-4">
+                                    <div v-for="(scenario, index) in editingRoute.screenshotScenarios || []" 
+                                         :key="index" 
+                                         class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div class="flex-1">
+                                                <select v-model="scenario.type" 
+                                                        class="border border-gray-300 rounded-md px-3 py-1 text-sm mr-2">
+                                                    <option value="default">默认页面</option>
+                                                    <option value="tab">Tab 切换</option>
+                                                    <option value="modal">弹窗</option>
+                                                    <option value="dropdown">下拉菜单</option>
+                                                    <option value="custom">自定义操作</option>
+                                                </select>
+                                                <input v-model="scenario.description" 
+                                                       type="text" 
+                                                       placeholder="场景描述（可选）"
+                                                       class="border border-gray-300 rounded-md px-3 py-1 text-sm flex-1">
+                                            </div>
+                                            <button @click="removeScenario(index)" 
+                                                    class="text-red-600 hover:text-red-900 ml-2">删除</button>
+                                        </div>
+                                        
+                                        <!-- Tab 场景配置 -->
+                                        <div v-if="scenario.type === 'tab'" class="grid grid-cols-3 gap-2 text-sm">
+                                            <input v-model="scenario.text" 
+                                                   type="text" 
+                                                   placeholder="Tab 文本"
+                                                   class="border border-gray-300 rounded-md px-2 py-1">
+                                            <input v-model.number="scenario.index" 
+                                                   type="number" 
+                                                   placeholder="Tab 索引（从0开始）"
+                                                   class="border border-gray-300 rounded-md px-2 py-1">
+                                            <input v-model="scenario.selector" 
+                                                   type="text" 
+                                                   placeholder="CSS 选择器"
+                                                   class="border border-gray-300 rounded-md px-2 py-1">
+                                        </div>
+                                        
+                                        <!-- Modal 场景配置 -->
+                                        <div v-if="scenario.type === 'modal' || scenario.type === 'dialog'" class="space-y-2 text-sm">
+                                            <input v-model="scenario.trigger" 
+                                                   type="text" 
+                                                   placeholder="触发动作（如：点击'新增用户'按钮）"
+                                                   class="w-full border border-gray-300 rounded-md px-2 py-1">
+                                            <label class="flex items-center">
+                                                <input v-model="scenario.closeAfter" type="checkbox" 
+                                                       class="rounded border-gray-300 text-blue-600 mr-2">
+                                                <span class="text-xs text-gray-600">截图后自动关闭弹窗</span>
+                                            </label>
+                                        </div>
+                                        
+                                        <!-- Dropdown 场景配置 -->
+                                        <div v-if="scenario.type === 'dropdown'" class="space-y-2 text-sm">
+                                            <input v-model="scenario.trigger" 
+                                                   type="text" 
+                                                   placeholder="触发动作（如：点击下拉按钮）"
+                                                   class="w-full border border-gray-300 rounded-md px-2 py-1">
+                                            <input v-model="scenario.selector" 
+                                                   type="text" 
+                                                   placeholder="或 CSS 选择器"
+                                                   class="w-full border border-gray-300 rounded-md px-2 py-1">
+                                        </div>
+                                        
+                                        <!-- Custom 场景配置 -->
+                                        <div v-if="scenario.type === 'custom'" class="space-y-2 text-sm">
+                                            <div class="text-xs text-gray-600 mb-1">操作序列（JSON 格式）：</div>
+                                            <textarea v-model="scenario.actionsJson" 
+                                                      placeholder='[{"type":"click","target":"按钮文本"},{"type":"wait","duration":1000}]'
+                                                      class="w-full border border-gray-300 rounded-md px-2 py-1 font-mono text-xs"
+                                                      rows="3"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button @click="addScenario" 
+                                        class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 text-sm mb-4">
+                                    ➕ 添加场景
+                                </button>
+                                
+                                <div class="flex gap-2 justify-end">
+                                    <button @click="saveScenarios" 
+                                            class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+                                        保存
+                                    </button>
+                                    <button @click="closeScenarioModal" 
+                                            class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">
+                                        取消
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -460,6 +584,8 @@
                 return {
                     activeTab: 'basic',
                     showAddRoute: false,
+                    showScenarioModal: false,
+                    editingRoute: null,
                     newRoute: {
                         menuText: '',
                         url: ''
@@ -473,6 +599,7 @@
                         timeout: 6000,
                         headless: true,
                         screenshots: false,
+                        autoDiscoverTabs: true,
                         screenshotComparison: {
                             enabled: false,
                             threshold: 0.1,
@@ -560,7 +687,20 @@
                 mergedConfigJson() {
                     const cfg = JSON.parse(this.configJson);
                     if (this.routes && this.routes.length > 0) {
-                        cfg.routes = this.routes.map(r => ({ menuText: r.menuText, url: r.url, level: r.level || 1 }));
+                        cfg.routes = this.routes.map(r => {
+                            const route = { menuText: r.menuText, url: r.url, level: r.level || 1 };
+                            if (r.screenshotScenarios && r.screenshotScenarios.length > 0) {
+                                route.screenshotScenarios = r.screenshotScenarios.map(s => {
+                                    const scenario = { ...s };
+                                    // 清理 actionsJson（如果存在）
+                                    if (scenario.actionsJson) {
+                                        delete scenario.actionsJson;
+                                    }
+                                    return scenario;
+                                });
+                            }
+                            return route;
+                        });
                     }
                     return JSON.stringify(cfg, null, 2);
                 }
@@ -672,6 +812,52 @@
                     if (confirm('确定要清空所有路由吗？')) {
                         this.routes = [];
                     }
+                },
+                editRouteScenarios(route) {
+                    this.editingRoute = JSON.parse(JSON.stringify(route)); // 深拷贝
+                    if (!this.editingRoute.screenshotScenarios) {
+                        this.editingRoute.screenshotScenarios = [];
+                    }
+                    this.showScenarioModal = true;
+                },
+                closeScenarioModal() {
+                    this.showScenarioModal = false;
+                    this.editingRoute = null;
+                },
+                addScenario() {
+                    if (!this.editingRoute.screenshotScenarios) {
+                        this.editingRoute.screenshotScenarios = [];
+                    }
+                    this.editingRoute.screenshotScenarios.push({
+                        type: 'default',
+                        description: ''
+                    });
+                },
+                removeScenario(index) {
+                    this.editingRoute.screenshotScenarios.splice(index, 1);
+                },
+                saveScenarios() {
+                    // 处理 custom 类型的 actionsJson
+                    this.editingRoute.screenshotScenarios.forEach(scenario => {
+                        if (scenario.type === 'custom' && scenario.actionsJson) {
+                            try {
+                                scenario.actions = JSON.parse(scenario.actionsJson);
+                                delete scenario.actionsJson;
+                            } catch (e) {
+                                alert('❌ 自定义操作 JSON 格式错误：' + e.message);
+                                return;
+                            }
+                        }
+                    });
+                    
+                    // 更新原路由
+                    const routeIndex = this.routes.findIndex(r => r.id === this.editingRoute.id);
+                    if (routeIndex !== -1) {
+                        this.routes[routeIndex] = { ...this.editingRoute };
+                    }
+                    
+                    this.closeScenarioModal();
+                    alert('✅ 场景配置已保存！');
                 },
                 addCheck() {
                     // 确保 checks 是数组
