@@ -72,16 +72,6 @@
                             <p class="text-xs text-gray-500 mt-1">选择令牌的注入方式</p>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">🎯 测试模式</label>
-                            <select v-model="config.mode" 
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
-                                <option value="ai">🤖 AI 模式 (智能发现菜单)</option>
-                                <option value="route">🛣️ 路由模式 (基于已知路由)</option>
-                                <option value="hybrid">🔄 混合模式 (AI + 路由)</option>
-                            </select>
-                            <p class="text-xs text-gray-500 mt-1">选择菜单测试的方式</p>
-                        </div>
-                        <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">🔑 令牌字段名</label>
                             <input v-model="config.tokenName" type="text" 
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
@@ -197,20 +187,6 @@
                                         <p>3. 菜单模式和路由模式使用相同的URL-based key，可互相对比</p>
                                     </div>
                                 </div>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">🚫 跳过菜单 (逗号分隔)</label>
-                                <input v-model="config.skip" type="text" 
-                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                                       placeholder="logout,exit,注销">
-                                <p class="text-xs text-gray-500 mt-1">不测试的菜单关键词</p>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">🎯 包含菜单 (逗号分隔)</label>
-                                <input v-model="config.include" type="text" 
-                                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-                                       placeholder="* (全部)">
-                                <p class="text-xs text-gray-500 mt-1">只测试匹配的菜单，* 表示全部</p>
                             </div>
                         </div>
                     </div>
@@ -463,11 +439,11 @@
                                 <p>npm install -g @hik-cloud/midscene-menu-tester</p>
                                 <br>
                                 <p># 2. 使用配置文件</p>
-                                <p>menu-tester --config config.json</p>
+                                <p>menu-tester test --config config.json</p>
                                 <br>
-                                <p># 3. 或使用路由模式</p>
+                                <p># 3. 维护路由并执行</p>
                                 <p>menu-tester routes import routes.json</p>
-                                <p>menu-tester test --mode route</p>
+                                <p>menu-tester test --config config.json</p>
                             </div>
                         </div>
                     </div>
@@ -494,7 +470,6 @@
                         token: '',
                         tokenMethod: 'cookie',
                         tokenName: 'accessToken',
-                        mode: 'ai',
                         timeout: 6000,
                         headless: true,
                         screenshots: false,
@@ -511,8 +486,6 @@
                             OPENAI_BASE_URL: 'https://api.openai.com/v1',
                             MIDSCENE_MODEL_NAME: ''
                         },
-                        skip: 'logout,exit,注销',
-                        include: '*',
                         pageAssertions: {
                             enabled: true,
                             midsceneTextCheck: {

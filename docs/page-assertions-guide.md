@@ -316,10 +316,10 @@
 
 ```bash
 # 使用默认配置进行断言测试
-node bin/menu-tester.js test --mode route --config hik-config.json
+node bin/menu-tester.js test --config hik-config.json
 
 # 开启详细日志查看断言详情
-node bin/menu-tester.js test --mode route --config hik-config.json --verbose
+node bin/menu-tester.js test --config hik-config.json --verbose
 ```
 
 ### 调试断言配置

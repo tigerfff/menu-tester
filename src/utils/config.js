@@ -65,16 +65,8 @@ function validateConfig(config) {
   }
 
   // Numeric validations
-  if (config.depth && (isNaN(config.depth) || config.depth < 1 || config.depth > 5)) {
-    errors.push('Depth must be a number between 1 and 5');
-  }
-
   if (config.timeout && (isNaN(config.timeout) || config.timeout < 1000 || config.timeout > 30000)) {
     errors.push('Timeout must be a number between 1000 and 30000 milliseconds');
-  }
-
-  if (config.concurrent && (isNaN(config.concurrent) || config.concurrent < 1 || config.concurrent > 10)) {
-    errors.push('Concurrent must be a number between 1 and 10');
   }
 
   if (config.retry && (isNaN(config.retry) || config.retry < 0 || config.retry > 5)) {
@@ -111,28 +103,14 @@ function validateConfig(config) {
  */
 function getDefaultConfig() {
   return {
-    depth: 2,
     timeout: 6000,
     headless: true,
     output: './menu-test-results',
-    concurrent: 1,
     retry: 2,
-    skip: 'logout,exit,注销',
-    include: '*',
     tokenMethod: 'cookie',
     tokenName: 'access_token',
     screenshots: false,
     verbose: false,
-    // 新增缓存相关配置
-    useCache: true,                    // 是否使用菜单缓存
-    cacheMaxAge: 7 * 24 * 60 * 60 * 1000, // 缓存最大存活时间（默认7天）
-    forceFreshDiscovery: false,        // 是否强制重新发现菜单（忽略缓存）
-    // 新增路由模式相关配置
-    testMode: 'hybrid',                // 测试模式: 'ai' | 'route' | 'hybrid'
-    hybridVerifyNew: true,             // 混合模式是否验证新菜单
-    autoTestNewMenus: true,            // 是否自动测试新发现的菜单
-    routeTimeout: 5000,                // 路由测试超时时间
-    validateRoutePages: true,          // 是否验证路由页面内容
     // routes: []                      // 可选：内联路由，提供后在路由模式下优先使用
     
     // 页面断言配置

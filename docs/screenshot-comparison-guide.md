@@ -252,7 +252,7 @@ A: 确保菜单对象包含 `url` 属性。PageValidator 会自动从 `this.page
 
 A: 设置 `updateBaseline: true` 并重新运行测试：
 ```bash
-menu-tester routes test --config config/hik-config.json
+menu-tester test --config config/hik-config.json
 ```
 
 ### Q3: 差异图在哪里？
@@ -275,7 +275,7 @@ A: 设置 `screenshots: true` 但 `screenshotComparison.enabled: false`：
 
 1. **基线存储**：将 `screenshots/baseline/` 提交到git，团队共享基线
 2. **差异图**：将 `screenshots/diff/` 添加到 `.gitignore`，避免提交临时文件
-3. **并发测试**：路由模式支持并发，但截图对比会增加IO开销，建议 `concurrent: 1-2`
+3. **执行节奏**：建议保持顺序执行（默认单线程），截图对比阶段 IO 开销较大，串行更易定位问题
 
 ## 下一步
 

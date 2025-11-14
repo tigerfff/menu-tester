@@ -123,15 +123,14 @@ menu-tester test --config downloaded-config.json
 ### 命令行模式
 
 ```bash
-# 路由模式 (推荐 - 快速稳定)
+# 导入或更新路由清单
 menu-tester routes import routes.json
-menu-tester test --mode route --config config.json
 
-# AI 模式 (智能发现)
-menu-tester test --mode ai --config config.json
+# 执行路由驱动测试
+menu-tester test --config config.json
 
-# 混合模式 (路由 + AI 验证)
-menu-tester test --mode hybrid --config config.json
+# 导出最新路由
+menu-tester routes export routes.json
 ```
 
 ## 故障排除

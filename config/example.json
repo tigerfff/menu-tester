@@ -1,23 +1,15 @@
 {
   "url": "https://admin.example.com",
   "token": "your-access-token-here",
-  "env": {
-    "OPENAI_API_KEY": "sk-your-openai-api-key-here",
-    "OPENAI_BASE_URL": "https://api.openai.com/v1",
-    "MIDSCENE_MODEL_NAME": ""
-  },
-  "options": {
-    "depth": 2,
-    "timeout": 10000,
-    "headless": true,
-    "output": "./menu-test-results",
-    "concurrent": 1,
-    "retry": 2,
-    "skip": "logout,exit,注销,登出",
-    "include": "*",
-    "screenshots": false,
-    "verbose": false
-  },
+  "timeout": 8000,
+  "headless": true,
+  "retry": 2,
+  "verbose": false,
+  "routes": [
+    { "menuText": "首页", "url": "https://admin.example.com/home" },
+    { "menuText": "巡检中心", "url": "https://admin.example.com/inspect" },
+    { "menuText": "系统设置", "url": "https://admin.example.com/settings" }
+  ],
   "tokenInjection": {
     "method": "cookie",
     "name": "access_token"
@@ -32,5 +24,10 @@
     "diffDir": "./screenshots/diff",
     "updateBaseline": false,
     "failOnDiff": false
+  },
+  "env": {
+    "OPENAI_API_KEY": "sk-your-openai-api-key-here",
+    "OPENAI_BASE_URL": "https://api.openai.com/v1",
+    "MIDSCENE_MODEL_NAME": ""
   }
 } 

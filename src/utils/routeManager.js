@@ -17,68 +17,10 @@ class RouteManager {
    */
   async loadCacheForRoutes() {
     try {
-      const fs = require('fs-extra');
-      const cacheFile = this.menuCache.cacheFile;
-      
-      if (!await fs.pathExists(cacheFile)) {
-        logger.debug('路由缓存文件不存在');
-        return;
+      const loaded = await this.menuCache.load();
+      if (!loaded) {
+        logger.debug('路由缓存文件不存在或不匹配');
       }
-
-      const cacheData = await fs.readJson(cacheFile);
-      
-      // 检查URL是否匹配
-      if (cacheData.url !== this.config.url) {
-        logger.debug('缓存URL不匹配，使用空缓存');
-        return;
-      }
-
-      // 重新构建缓存对象，特别处理路由数据
-      this.menuCache.cache = {
-        ...cacheData,
-        menus: {
-          topLevel: cacheData.menus.topLevel || [],
-          subMenus: new Map()
-        },
-        routes: {
-          menuRoutes: new Map(),
-          routeValidation: new Map(),
-          hierarchy: [],
-          parameters: new Map()
-        }
-      };
-
-      // 安全地转换路由数据
-      if (cacheData.routes) {
-        // 转换 menuRoutes
-        if (cacheData.routes.menuRoutes) {
-          if (typeof cacheData.routes.menuRoutes === 'object' && !Array.isArray(cacheData.routes.menuRoutes)) {
-            this.menuCache.cache.routes.menuRoutes = new Map(Object.entries(cacheData.routes.menuRoutes));
-          }
-        }
-        
-        // 转换 routeValidation
-        if (cacheData.routes.routeValidation) {
-          if (typeof cacheData.routes.routeValidation === 'object' && !Array.isArray(cacheData.routes.routeValidation)) {
-            this.menuCache.cache.routes.routeValidation = new Map(Object.entries(cacheData.routes.routeValidation));
-          }
-        }
-        
-        // 其他路由数据
-        this.menuCache.cache.routes.hierarchy = cacheData.routes.hierarchy || [];
-        
-        if (cacheData.routes.parameters) {
-          if (typeof cacheData.routes.parameters === 'object' && !Array.isArray(cacheData.routes.parameters)) {
-            this.menuCache.cache.routes.parameters = new Map(Object.entries(cacheData.routes.parameters));
-          }
-        }
-      }
-
-      const routeCount = this.menuCache.cache.routes.menuRoutes.size;
-      if (routeCount > 0) {
-        logger.debug(`成功加载路由缓存: ${routeCount} 个路由映射`);
-      }
-      
     } catch (error) {
       logger.debug(`加载路由缓存失败: ${error.message}`);
     }
