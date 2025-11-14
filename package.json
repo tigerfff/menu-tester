@@ -1,6 +1,6 @@
 {
   "name": "menu-tester",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "AI-powered menu testing CLI tool using Playwright and Midscene.js",
   "main": "src/MenuTester.js",
   "bin": {
@@ -11,7 +11,12 @@
     "serve": "node bin/menu-tester.js serve",
     "build": "echo 'No build step needed'",
     "test": "echo 'Tests not implemented yet' && exit 0",
-    "postinstall": "npx playwright install chromium"  
+    "postinstall": "npx playwright install chromium",
+    "prepublishOnly": "npm test && npm run build",
+    "publish:npm": "npm publish --access public",
+    "publish:patch": "npm version patch && npm run publish:npm",
+    "publish:minor": "npm version minor && npm run publish:npm",
+    "publish:major": "npm version major && npm run publish:npm"
   },
   "keywords": [
     "menu-testing",
