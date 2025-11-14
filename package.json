@@ -1,6 +1,6 @@
 {
   "name": "menu-tester",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-powered menu testing CLI tool using Playwright and Midscene.js",
   "main": "src/MenuTester.js",
   "bin": {
@@ -11,7 +11,7 @@
     "serve": "node bin/menu-tester.js serve",
     "build": "echo 'No build step needed'",
     "test": "echo 'Tests not implemented yet' && exit 0",
-    "postinstall": "npx playwright install chromium"
+    "postinstall": "npx playwright install chromium"  
   },
   "keywords": [
     "menu-testing",
@@ -20,10 +20,10 @@
     "midscene",
     "cli",
     "ai",
-    "testing",
+    "testing",  
     "spa",
     "web-testing",
-    "route-testing"
+    "route-testing"   
   ],
   "author": "HIK-Cloud Team",
   "license": "MIT",

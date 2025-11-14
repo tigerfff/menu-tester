@@ -89,6 +89,10 @@ echo "OPENAI_API_KEY=sk-xxx" > .env
   "token": "your-access-token",
   "tokenMethod": "cookie",
   "tokenName": "access_token",
+  "localStorageItems": {
+    "guide_shown": "1",
+    "user_preference": "dark"
+  },
   "mode": "hybrid",
   "depth": 2,
   "timeout": 6000,
@@ -189,6 +193,53 @@ menu-tester test --mode route
 
 # 详细日志
 menu-tester test --config config.json --verbose
+```
+
+## LocalStorage 自动注入
+
+通过 `localStorageItems` 配置项，可以在每次页面跳转时自动设置 localStorage 值。
+
+### 配置说明
+
+```json
+{
+  "localStorageItems": {
+    "key1": "value1",
+    "key2": "value2"
+  }
+}
+```
+
+- **键值对形式** - 键名和对应的值都是字符串
+- **自动注入** - 每次页面导航前自动执行
+- **持久有效** - 整个测试会话期间都会生效
+
+### 常见用途
+
+1. **隐藏新手引导** - 设置引导标记避免弹窗干扰测试
+2. **预设用户偏好** - 设置主题、语言等配置
+3. **模拟用户状态** - 设置特定的应用状态标记
+4. **跳过欢迎页** - 标记用户已访问过某些页面
+
+### Web 界面配置
+
+在 Web 配置界面的"基础配置"选项卡中：
+1. 找到"自定义 LocalStorage 项"区域
+2. 点击"+ 添加项"添加键值对
+3. 输入键名和值
+4. 可随时删除不需要的项
+5. 导出配置时会自动包含
+
+### 示例：隐藏引导提示
+
+```json
+{
+  "localStorageItems": {
+    "app_guide_shown": "1",
+    "tutorial_completed": "true",
+    "welcome_dismissed": "1"
+  }
+}
 ```
 
 ## 页面断言配置

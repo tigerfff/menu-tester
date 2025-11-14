@@ -22,6 +22,9 @@
     "method": "cookie",
     "name": "access_token"
   },
+  "localStorageItems": {
+    "example_key": "example_value"
+  },
   "screenshotComparison": {
     "enabled": false,
     "threshold": 0.1,

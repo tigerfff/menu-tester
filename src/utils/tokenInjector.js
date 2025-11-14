@@ -4,8 +4,10 @@ class TokenInjector {
   constructor(config) {
     this.token = config.token || process.env.ACCESS_TOKEN;
     this.method = config.tokenMethod || 'cookie';
-    this.tokenName = 'accessToken';
+    this.tokenName = config.tokenName || 'accessToken';
     this.url = config.url;
+    // 自定义 localStorage 配置
+    this.localStorageItems = config.localStorageItems || {};
   }
 
   /**
@@ -21,23 +23,16 @@ class TokenInjector {
     logger.debug(`Injecting token using method: ${this.method}`);
 
     try {
-      // 在导航前就设置 Cookie 和 localStorage
-    //   await this.injectCookie(context);
-      
-      // 设置 localStorage 的 initScript（会在每次导航时自动执行）
-      await page.addInitScript(() => {
-        if (window.location.hostname.includes('hik-cloud.com')) {
-          localStorage.setItem('Chain_FullScreenGuide', '1');
-          localStorage.setItem('Chain_IntelliInspect_addMode', '1');
-          localStorage.setItem('Chain_MenuConfigEnter', '1');
-          localStorage.setItem('Chain_SceneVideoMenuGuideShown', '1');
-          localStorage.setItem('Chain_SceneVideoRightMenuGuideShown', '1');
-          localStorage.setItem('Chain_StoreActionMoreBtn', '1');
-          localStorage.setItem('Chain_SubmenuFAQGuide', '1');
-          localStorage.setItem('Chain_TopMenuGuide', '1');
-          localStorage.setItem('Chain_VideoSceneLeftResizeGuide', '1');
-        }
-      });
+      // 设置自定义 localStorage 项（会在每次导航时自动执行）
+      if (Object.keys(this.localStorageItems).length > 0) {
+        await page.addInitScript((items) => {
+          Object.entries(items).forEach(([key, value]) => {
+            localStorage.setItem(key, value);
+          });
+        }, this.localStorageItems);
+        
+        logger.debug(`LocalStorage items configured: ${Object.keys(this.localStorageItems).length} items`);
+      }
 
       switch (this.method) {
         case 'cookie':
