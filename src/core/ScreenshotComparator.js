@@ -66,27 +66,37 @@ class ScreenshotComparator {
 
   /**
    * 生成统一的截图key（菜单模式和路由模式通用）
-   * @param {object} menu - 菜单项（包含 url 或 id）
+   * @param {object} menu - 菜单项（包含 url 或 id，可能包含 scenario 场景信息）
    * @returns {string} 唯一标识
    */
   getScreenshotKey(menu) {
     // 优先使用URL生成key（两种模式通用）
+    let baseKey;
     if (menu.url) {
       const urlKey = this.normalizeUrl(menu.url);
       logger.debug(`生成截图key from URL: ${menu.url} -> ${urlKey}`);
-      return urlKey;
+      baseKey = urlKey;
     }
-    
     // 降级方案1：使用菜单ID
-    if (menu.id && !menu.id.startsWith('route-')) {
+    else if (menu.id && !menu.id.startsWith('route-')) {
       logger.debug(`生成截图key from ID: ${menu.id}`);
-      return menu.id.toLowerCase();
+      baseKey = menu.id.toLowerCase();
+    }
+    // 降级方案2：使用文本
+    else {
+      const textKey = menu.text.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '-').toLowerCase();
+      logger.debug(`生成截图key from text: ${menu.text} -> ${textKey}`);
+      baseKey = textKey;
     }
     
-    // 降级方案2：使用文本
-    const textKey = menu.text.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '-').toLowerCase();
-    logger.debug(`生成截图key from text: ${menu.text} -> ${textKey}`);
-    return textKey;
+    // 如果有场景信息，添加到 key 中（确保不同场景的截图有独立的基线）
+    if (menu.scenario && menu.scenario !== 'default') {
+      const scenarioKey = menu.scenario.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '-').toLowerCase().substring(0, 50);
+      baseKey = `${baseKey}-${scenarioKey}`;
+      logger.debug(`添加场景信息到 key: ${baseKey}`);
+    }
+    
+    return baseKey;
   }
 
   /**

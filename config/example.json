@@ -5,6 +5,18 @@
   "headless": true,
   "retry": 2,
   "verbose": false,
+  "viewport": {
+    "preset": "Desktop Chrome"
+  },
+  "performance": {
+    "enabled": true,
+    "onlyFirstRoute": true,
+    "thresholds": {
+      "fcp": 2000,
+      "lcp": 3000,
+      "ttfb": 500
+    }
+  },
   "routes": [
     { 
       "menuText": "首页", 

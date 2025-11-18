@@ -112,7 +112,7 @@ program
   .option('--config <path>', '配置文件路径')
   .option('--timeout <number>', '页面超时时间（毫秒）', '10000')
   .option('--headless [boolean]', '是否使用无头模式运行', true)
-  .option('--output <path>', '结果输出目录', './menu-test-results')
+  .option('--output <path>',   '结果输出目录', './menu-test-results')
   .option('--retry <number>', '失败操作的重试次数', '2')
   .option('--token-method <method>', '令牌注入方式：cookie|localStorage|header', 'cookie')
   .option('--token-name <name>', '令牌注入名称', 'access_token')

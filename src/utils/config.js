@@ -79,6 +79,65 @@ function validateConfig(config) {
     errors.push(`Token method must be one of: ${validTokenMethods.join(', ')}`);
   }
 
+  // Viewport validation
+  if (config.viewport !== undefined) {
+    if (typeof config.viewport !== 'object' || config.viewport === null) {
+      errors.push('viewport must be an object');
+    } else {
+      // 如果使用预设
+      if (config.viewport.preset) {
+        if (typeof config.viewport.preset !== 'string') {
+          errors.push('viewport.preset must be a string');
+        }
+      }
+      // 如果使用自定义配置
+      else if (config.viewport.custom) {
+        const custom = config.viewport.custom;
+        if (custom.width !== undefined && (isNaN(custom.width) || custom.width < 1 || custom.width > 10000)) {
+          errors.push('viewport.custom.width must be a number between 1 and 10000');
+        }
+        if (custom.height !== undefined && (isNaN(custom.height) || custom.height < 1 || custom.height > 10000)) {
+          errors.push('viewport.custom.height must be a number between 1 and 10000');
+        }
+        if (custom.deviceScaleFactor !== undefined && (isNaN(custom.deviceScaleFactor) || custom.deviceScaleFactor < 1 || custom.deviceScaleFactor > 10)) {
+          errors.push('viewport.custom.deviceScaleFactor must be a number between 1 and 10');
+        }
+      }
+      // 兼容旧格式
+      else if (config.viewport.width || config.viewport.height) {
+        if (config.viewport.width !== undefined && (isNaN(config.viewport.width) || config.viewport.width < 1 || config.viewport.width > 10000)) {
+          errors.push('viewport.width must be a number between 1 and 10000');
+        }
+        if (config.viewport.height !== undefined && (isNaN(config.viewport.height) || config.viewport.height < 1 || config.viewport.height > 10000)) {
+          errors.push('viewport.height must be a number between 1 and 10000');
+        }
+      }
+    }
+  }
+
+  // Performance validation
+  if (config.performance !== undefined) {
+    if (typeof config.performance !== 'object' || config.performance === null) {
+      errors.push('performance must be an object');
+    } else {
+      if (config.performance.thresholds !== undefined) {
+        const thresholds = config.performance.thresholds;
+        if (typeof thresholds !== 'object') {
+          errors.push('performance.thresholds must be an object');
+        } else {
+          const validThresholds = ['fcp', 'lcp', 'ttfb', 'domContentLoaded'];
+          Object.keys(thresholds).forEach(key => {
+            if (!validThresholds.includes(key)) {
+              errors.push(`performance.thresholds.${key} is not a valid threshold name`);
+            } else if (isNaN(thresholds[key]) || thresholds[key] < 0) {
+              errors.push(`performance.thresholds.${key} must be a positive number`);
+            }
+          });
+        }
+      }
+    }
+  }
+
   // Optional inline routes validation
   if (config.routes !== undefined) {
     if (!Array.isArray(config.routes)) {
@@ -134,6 +193,18 @@ function getDefaultConfig() {
     tokenName: 'access_token',
     screenshots: false,
     verbose: false,
+    viewport: {
+      preset: 'Desktop Chrome'  // 默认使用桌面 Chrome 预设
+    },
+    performance: {
+      enabled: true,  // 是否启用性能监控
+      onlyFirstRoute: true,  // 只在第一个路由测试性能
+      thresholds: {
+        fcp: 2000,  // First Contentful Paint 阈值 (ms)
+        lcp: 3000,  // Largest Contentful Paint 阈值 (ms)
+        ttfb: 500   // Time to First Byte 阈值 (ms)
+      }
+    },
     // routes: []                      // 可选：内联路由，提供后在路由模式下优先使用
     
     // 页面断言配置

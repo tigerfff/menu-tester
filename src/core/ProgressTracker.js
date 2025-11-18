@@ -1,6 +1,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const { logger } = require('../utils/logger');
+const ReportGenerator = require('../utils/ReportGenerator');
 
 class ProgressTracker {
   constructor(config) {
@@ -9,6 +10,7 @@ class ProgressTracker {
     this.outputDir = config.output || './menu-test-results';
     this.progressFile = path.join(this.outputDir, `session-${this.sessionId}.json`);
     this.startTime = Date.now();
+    this.reportGenerator = new ReportGenerator(this, config);
     
     this.progress = {
       sessionId: this.sessionId,
@@ -214,9 +216,12 @@ class ProgressTracker {
       
       menu.status = result.success ? 'completed' : 'failed';
       menu.endTime = Date.now();
-      menu.duration = menu.endTime - menu.startTime;
+      menu.duration = result.duration || (menu.endTime - menu.startTime);
       menu.error = result.error || null;
       menu.screenshot = result.screenshot || null;
+      menu.screenshots = result.screenshots || null;
+      menu.performance = result.performance || null; // 性能指标
+      menu.screenshotComparisons = result.screenshotComparisons || []; // 截图对比数据
       
       if (result.success) {
         this.progress.completedMenus += 1;
@@ -270,7 +275,16 @@ class ProgressTracker {
     await this.saveProgress();
     
     logger.success(`\n会话完成！总耗时: ${this.formatDuration(this.progress.duration)}`);
-    this.displayFinalSummary();
+    
+    // 生成详细的控制台报告
+    this.reportGenerator.generateConsoleReport(summary);
+    
+    // 生成 HTML 报告
+    try {
+      await this.reportGenerator.generateHTMLReport(summary);
+    } catch (error) {
+      logger.warning(`生成 HTML 报告失败: ${error.message}`);
+    }
   }
 
   /**

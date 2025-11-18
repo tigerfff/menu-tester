@@ -6,6 +6,8 @@ const PageValidator = require('./core/PageValidator');
 const ProgressTracker = require('./core/ProgressTracker');
 const MenuCache = require('./core/MenuCache');
 const { logger } = require('./utils/logger');
+const { parseViewportConfig } = require('./utils/devicePresets');
+const PerformanceMonitor = require('./utils/PerformanceMonitor');
 
 class MenuTester {
   constructor(config) {
@@ -17,6 +19,7 @@ class MenuTester {
     this.pageValidator = null;
     this.progressTracker = null;
     this.menuCache = null;
+    this.performanceMonitor = null;
     this.mainPageUrl = config.url;
 
     logger.setVerbose(config.verbose || false);
@@ -34,6 +37,7 @@ class MenuTester {
 
       this.tokenInjector = new TokenInjector(this.config);
       this.pageValidator = new PageValidator(this.agent, this.page, this.config);
+      this.performanceMonitor = new PerformanceMonitor(this.page, this.config);
 
       await this.setupPage();
       await this.executeRouteModeTesting();
@@ -110,7 +114,9 @@ class MenuTester {
           logger.debug(`🔍 [调试] 路由 "${route.menuText}" 在测试前检查：无场景配置`);
         }
 
-        await this.testSingleRoute(route, routeMenus[i]);
+        // 如果是第一个路由且启用了性能监控，测量性能
+        const isFirstRoute = i === 0;
+        await this.testSingleRoute(route, routeMenus[i], isFirstRoute);
 
         if (i < routes.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -124,7 +130,7 @@ class MenuTester {
     }
   }
 
-  async testSingleRoute(route, menuItem) {
+  async testSingleRoute(route, menuItem, measurePerformance = false) {
     try {
       await this.progressTracker.startMenu(menuItem.id);
 
@@ -135,6 +141,12 @@ class MenuTester {
       });
 
       await this.waitForPageStable();
+
+      // 如果是第一个路由且启用了性能监控，测量性能
+      let performanceMetrics = null;
+      if (measurePerformance && this.performanceMonitor && this.performanceMonitor.enabled) {
+        performanceMetrics = await this.performanceMonitor.measurePerformance();
+      }
 
       const validationResult = await this.validateRoutePage(route);
 
@@ -156,6 +168,9 @@ class MenuTester {
         logger.debug('截图功能未启用');
       }
 
+      // 提取截图对比数据
+      const screenshotComparisons = this.extractScreenshotComparisons(screenshots);
+
       const testResult = {
         success: validationResult.success,
         error: validationResult.error,
@@ -163,7 +178,10 @@ class MenuTester {
         screenshots: screenshots, // 明确的多截图字段
         details: validationResult,
         url: route.url,
-        mode: 'route'
+        mode: 'route',
+        duration: Date.now() - (this.progressTracker.progress.menus[menuItem.id]?.startTime || Date.now()),
+        performance: performanceMetrics, // 性能指标（仅第一个路由）
+        screenshotComparisons: screenshotComparisons // 截图对比数据
       };
 
       await this.progressTracker.completeMenu(menuItem.id, testResult);
@@ -180,7 +198,10 @@ class MenuTester {
         screenshot: null,
         screenshots: null,
         url: route.url,
-        mode: 'route'
+        mode: 'route',
+        duration: Date.now() - (this.progressTracker.progress.menus[menuItem.id]?.startTime || Date.now()),
+        performance: null,
+        screenshotComparisons: []
       };
 
       await this.progressTracker.completeMenu(menuItem.id, failResult);
@@ -686,10 +707,29 @@ class MenuTester {
         args: ['--no-sandbox', '--disable-setuid-sandbox']
       });
       
-      const context = await this.browser.newContext({
-        viewport: { width: 1920, height: 1080 },
-        userAgent: this.config.userAgent || undefined
-      });
+      // 解析 viewport 配置
+      const viewportConfig = parseViewportConfig(this.config.viewport);
+      
+      // 构建 context 选项
+      const contextOptions = {
+        viewport: viewportConfig.viewport,
+        userAgent: viewportConfig.userAgent || this.config.userAgent || undefined
+      };
+      
+      // 添加设备相关配置（如果存在）
+      if (viewportConfig.deviceScaleFactor !== undefined) {
+        contextOptions.deviceScaleFactor = viewportConfig.deviceScaleFactor;
+      }
+      if (viewportConfig.isMobile !== undefined) {
+        contextOptions.isMobile = viewportConfig.isMobile;
+      }
+      if (viewportConfig.hasTouch !== undefined) {
+        contextOptions.hasTouch = viewportConfig.hasTouch;
+      }
+      
+      logger.info(`使用视口配置: ${viewportConfig.viewport.width}x${viewportConfig.viewport.height}${viewportConfig.isMobile ? ' (移动设备)' : ' (桌面)'}`);
+      
+      const context = await this.browser.newContext(contextOptions);
       
       this.page = await context.newPage();
       
@@ -748,6 +788,44 @@ class MenuTester {
     } catch (error) {
       logger.debug(`Cleanup failed: ${error.message}`);
     }
+  }
+
+  /**
+   * 从截图结果中提取对比数据
+   * @param {string|Array|null} screenshots - 截图结果
+   * @returns {Array} 截图对比数据数组
+   */
+  extractScreenshotComparisons(screenshots) {
+    if (!screenshots) {
+      return [];
+    }
+
+    const comparisons = [];
+
+    // 如果是数组
+    if (Array.isArray(screenshots)) {
+      screenshots.forEach(item => {
+        if (item.screenshot && typeof item.screenshot === 'object' && item.screenshot.comparison) {
+          comparisons.push({
+            scenario: item.scenario || 'default',
+            match: item.screenshot.comparison.match !== false,
+            diffPercentage: item.screenshot.comparison.diffPercentage || 0,
+            type: item.screenshot.comparison.type
+          });
+        }
+      });
+    }
+    // 如果是单个对象
+    else if (typeof screenshots === 'object' && screenshots.comparison) {
+      comparisons.push({
+        scenario: 'default',
+        match: screenshots.comparison.match !== false,
+        diffPercentage: screenshots.comparison.diffPercentage || 0,
+        type: screenshots.comparison.type
+      });
+    }
+
+    return comparisons;
   }
 
   getStatus() {

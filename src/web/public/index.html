@@ -108,6 +108,92 @@
                     </div>
                     
                     <div class="border-t pt-6">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">📱 视口/设备配置</h3>
+                        <div class="bg-blue-50 p-4 rounded-lg border border-blue-200 mb-6">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">设备类型</label>
+                                <select v-model="viewportConfig.mode" 
+                                        @change="onViewportModeChange"
+                                        class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="preset">使用预设设备</option>
+                                    <option value="custom">自定义配置</option>
+                                </select>
+                            </div>
+                            
+                            <!-- 预设设备选择 -->
+                            <div v-if="viewportConfig.mode === 'preset'" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">选择设备预设</label>
+                                    <select v-model="viewportConfig.preset" 
+                                            @change="onPresetChange"
+                                            class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <optgroup label="🖥️ 桌面设备">
+                                            <option v-for="device in devicePresets.desktop" :key="device.key" :value="device.key">
+                                                {{ device.name }} ({{ device.viewport.width }}x{{ device.viewport.height }})
+                                            </option>
+                                        </optgroup>
+                                        <optgroup label="📱 移动设备">
+                                            <option v-for="device in devicePresets.mobile" :key="device.key" :value="device.key">
+                                                {{ device.name }} ({{ device.viewport.width }}x{{ device.viewport.height }})
+                                            </option>
+                                        </optgroup>
+                                        <optgroup label="📱 平板设备">
+                                            <option v-for="device in devicePresets.tablet" :key="device.key" :value="device.key">
+                                                {{ device.name }} ({{ device.viewport.width }}x{{ device.viewport.height }})
+                                            </option>
+                                        </optgroup>
+                                    </select>
+                                    <p class="text-xs text-gray-500 mt-1">选择常用设备预设，自动配置视口和 User-Agent</p>
+                                </div>
+                                <div v-if="viewportConfig.preset" class="bg-white p-3 rounded border border-gray-200">
+                                    <div class="text-sm text-gray-600">
+                                        <div><strong>设备:</strong> {{ getPresetInfo(viewportConfig.preset)?.name }}</div>
+                                        <div><strong>视口:</strong> {{ getPresetInfo(viewportConfig.preset)?.viewport.width }} x {{ getPresetInfo(viewportConfig.preset)?.viewport.height }}</div>
+                                        <div><strong>类型:</strong> {{ getPresetInfo(viewportConfig.preset)?.isMobile ? '移动设备' : '桌面设备' }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 自定义配置 -->
+                            <div v-if="viewportConfig.mode === 'custom'" class="space-y-4">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">宽度 (px)</label>
+                                        <input v-model.number="viewportConfig.custom.width" type="number" min="1" max="10000"
+                                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                               placeholder="1920">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-2">高度 (px)</label>
+                                        <input v-model.number="viewportConfig.custom.height" type="number" min="1" max="10000"
+                                               class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                               placeholder="1080">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="flex items-center">
+                                        <input v-model="viewportConfig.custom.isMobile" type="checkbox" 
+                                               class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                        <span class="ml-2 text-sm text-gray-700">移动设备</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="flex items-center">
+                                        <input v-model="viewportConfig.custom.hasTouch" type="checkbox" 
+                                               class="rounded border-gray-300 text-blue-600 shadow-sm">
+                                        <span class="ml-2 text-sm text-gray-700">支持触摸</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">设备像素比 (可选)</label>
+                                    <input v-model.number="viewportConfig.custom.deviceScaleFactor" type="number" step="0.1" min="1" max="10"
+                                           class="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                                           placeholder="1">
+                                    <p class="text-xs text-gray-500 mt-1">通常移动设备为 2-3，桌面为 1</p>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <h3 class="text-lg font-medium text-gray-900 mb-4">⚙️ 高级设置</h3>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
@@ -591,6 +677,44 @@
                         url: ''
                     },
                     localStorageList: [],
+                    viewportConfig: {
+                        mode: 'preset',  // 'preset' 或 'custom'
+                        preset: 'Desktop Chrome',
+                        custom: {
+                            width: 1920,
+                            height: 1080,
+                            isMobile: false,
+                            hasTouch: false,
+                            deviceScaleFactor: 1
+                        }
+                    },
+                    devicePresets: {
+                        desktop: [
+                            { key: 'Desktop Chrome', name: 'Desktop Chrome', viewport: { width: 1920, height: 1080 }, isMobile: false },
+                            { key: 'Desktop Firefox', name: 'Desktop Firefox', viewport: { width: 1920, height: 1080 }, isMobile: false },
+                            { key: 'Desktop Safari', name: 'Desktop Safari', viewport: { width: 1920, height: 1080 }, isMobile: false }
+                        ],
+                        mobile: [
+                            { key: 'iPhone SE', name: 'iPhone SE', viewport: { width: 375, height: 667 }, isMobile: true },
+                            { key: 'iPhone 6/7/8', name: 'iPhone 6/7/8', viewport: { width: 375, height: 667 }, isMobile: true },
+                            { key: 'iPhone 6/7/8 Plus', name: 'iPhone 6/7/8 Plus', viewport: { width: 414, height: 736 }, isMobile: true },
+                            { key: 'iPhone X', name: 'iPhone X', viewport: { width: 375, height: 812 }, isMobile: true },
+                            { key: 'iPhone 11 Pro', name: 'iPhone 11 Pro', viewport: { width: 375, height: 812 }, isMobile: true },
+                            { key: 'iPhone 12 Pro', name: 'iPhone 12 Pro', viewport: { width: 390, height: 844 }, isMobile: true },
+                            { key: 'iPhone 13 Pro', name: 'iPhone 13 Pro', viewport: { width: 390, height: 844 }, isMobile: true },
+                            { key: 'iPhone 14 Pro', name: 'iPhone 14 Pro', viewport: { width: 393, height: 852 }, isMobile: true },
+                            { key: 'iPhone 15 Pro', name: 'iPhone 15 Pro', viewport: { width: 393, height: 852 }, isMobile: true },
+                            { key: 'Galaxy S5', name: 'Galaxy S5', viewport: { width: 360, height: 640 }, isMobile: true },
+                            { key: 'Galaxy S8', name: 'Galaxy S8', viewport: { width: 360, height: 740 }, isMobile: true },
+                            { key: 'Pixel 5', name: 'Pixel 5', viewport: { width: 393, height: 851 }, isMobile: true },
+                            { key: 'Pixel 7', name: 'Pixel 7', viewport: { width: 412, height: 915 }, isMobile: true }
+                        ],
+                        tablet: [
+                            { key: 'iPad', name: 'iPad', viewport: { width: 768, height: 1024 }, isMobile: true },
+                            { key: 'iPad Pro', name: 'iPad Pro', viewport: { width: 1024, height: 1366 }, isMobile: true },
+                            { key: 'iPad Mini', name: 'iPad Mini', viewport: { width: 768, height: 1024 }, isMobile: true }
+                        ]
+                    },
                     config: {
                         url: '',
                         token: '',
@@ -670,6 +794,24 @@
             computed: {
                 configJson() {
                     const cfg = { ...this.config };
+                    
+                    // 添加 viewport 配置
+                    if (this.viewportConfig.mode === 'preset') {
+                        cfg.viewport = {
+                            preset: this.viewportConfig.preset
+                        };
+                    } else {
+                        cfg.viewport = {
+                            custom: {
+                                width: this.viewportConfig.custom.width,
+                                height: this.viewportConfig.custom.height,
+                                isMobile: this.viewportConfig.custom.isMobile,
+                                hasTouch: this.viewportConfig.custom.hasTouch,
+                                deviceScaleFactor: this.viewportConfig.custom.deviceScaleFactor
+                            }
+                        };
+                    }
+                    
                     // 转换 localStorageList 为 localStorageItems 对象
                     if (this.localStorageList.length > 0) {
                         cfg.localStorageItems = {};
@@ -764,6 +906,24 @@
                                         imported = true;
                                     }
                                     
+                                    // 导入 viewport 配置
+                                    if (data.viewport) {
+                                        if (data.viewport.preset) {
+                                            this.viewportConfig.mode = 'preset';
+                                            this.viewportConfig.preset = data.viewport.preset;
+                                        } else if (data.viewport.custom) {
+                                            this.viewportConfig.mode = 'custom';
+                                            this.viewportConfig.custom = {
+                                                width: data.viewport.custom.width || 1920,
+                                                height: data.viewport.custom.height || 1080,
+                                                isMobile: data.viewport.custom.isMobile || false,
+                                                hasTouch: data.viewport.custom.hasTouch || false,
+                                                deviceScaleFactor: data.viewport.custom.deviceScaleFactor || 1
+                                            };
+                                        }
+                                        imported = true;
+                                    }
+                                    
                                     if (imported) {
                                         alert('✅ 配置导入成功！');
                                     } else {
@@ -777,6 +937,24 @@
                         }
                     };
                     input.click();
+                },
+                onViewportModeChange() {
+                    // 切换模式时的处理
+                    if (this.viewportConfig.mode === 'preset' && !this.viewportConfig.preset) {
+                        this.viewportConfig.preset = 'Desktop Chrome';
+                    }
+                },
+                onPresetChange() {
+                    // 预设改变时的处理（可以在这里添加额外逻辑）
+                },
+                getPresetInfo(presetKey) {
+                    // 从所有预设中查找
+                    const allPresets = [
+                        ...this.devicePresets.desktop,
+                        ...this.devicePresets.mobile,
+                        ...this.devicePresets.tablet
+                    ];
+                    return allPresets.find(p => p.key === presetKey) || null;
                 },
                 exportRoutes() {
                     this.downloadRoutes();
