@@ -809,7 +809,7 @@ class MenuTester {
           comparisons.push({
             scenario: item.scenario || 'default',
             match: item.screenshot.comparison.match !== false,
-            diffPercentage: item.screenshot.comparison.diffPercentage || 0,
+            diffPercentage: Number(item.screenshot.comparison.diffPercentage) || 0,
             type: item.screenshot.comparison.type
           });
         }
@@ -820,7 +820,7 @@ class MenuTester {
       comparisons.push({
         scenario: 'default',
         match: screenshots.comparison.match !== false,
-        diffPercentage: screenshots.comparison.diffPercentage || 0,
+        diffPercentage: Number(screenshots.comparison.diffPercentage) || 0,
         type: screenshots.comparison.type
       });
     }

@@ -218,7 +218,7 @@ class ReportGenerator {
     const total = allComparisons.length;
     const passed = allComparisons.filter(c => c.match).length;
     const failed = total - passed;
-    const avgDiff = allComparisons.reduce((sum, c) => sum + c.diffPercentage, 0) / total;
+    const avgDiff = allComparisons.reduce((sum, c) => sum + (Number(c.diffPercentage) || 0), 0) / total;
 
     logger.info(`总截图数: ${total}`);
     logger.info(`对比通过: ${passed} (${((passed / total) * 100).toFixed(1)}%)`);
@@ -226,12 +226,13 @@ class ReportGenerator {
     logger.info(`平均差异: ${avgDiff.toFixed(2)}%`);
 
     // 差异详情
-    const failedComparisons = allComparisons.filter(c => !c.match || c.diffPercentage > 2);
+    const failedComparisons = allComparisons.filter(c => !c.match || (Number(c.diffPercentage) || 0) > 2);
     if (failedComparisons.length > 0) {
       logger.warning('\n⚠️  差异详情:');
       failedComparisons.forEach(comp => {
         const icon = comp.match ? '⚠️' : '❌';
-        logger.warning(`  ${icon} ${comp.scenario}: ${comp.diffPercentage}%`);
+        const diffPercent = Number(comp.diffPercentage) || 0;
+        logger.warning(`  ${icon} ${comp.scenario}: ${diffPercent.toFixed(2)}%`);
       });
     }
   }
@@ -627,15 +628,16 @@ class ReportGenerator {
     const total = comparisons.length;
     const passed = comparisons.filter(c => c.match).length;
     const failed = total - passed;
-    const avgDiff = comparisons.reduce((sum, c) => sum + c.diffPercentage, 0) / total;
+    const avgDiff = comparisons.reduce((sum, c) => sum + (Number(c.diffPercentage) || 0), 0) / total;
 
     const rows = comparisons.map(c => {
       const badge = c.match ? 'badge-success' : 'badge-danger';
+      const diffPercent = Number(c.diffPercentage) || 0;
       return `
         <tr>
             <td>${this.escapeHtml(c.scenario)}</td>
             <td><span class="badge ${badge}">${c.match ? '通过' : '失败'}</span></td>
-            <td>${c.diffPercentage.toFixed(2)}%</td>
+            <td>${diffPercent.toFixed(2)}%</td>
         </tr>`;
     }).join('');
 
